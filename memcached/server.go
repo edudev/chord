@@ -1,12 +1,12 @@
-package main
+package memcached
 
 import (
     memcached "github.com/mattrobenolt/go-memcached"
 )
 
-type Cache struct {}
+type MemcachedServer struct {}
 
-func (c *Cache) Get(key string) (response memcached.MemcachedResponse) {
+func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse) {
     if key == "hello" {
         item := &memcached.Item{
             Key: key,
@@ -24,6 +24,6 @@ func (c *Cache) Get(key string) (response memcached.MemcachedResponse) {
 }
 
 func main() {
-    server := memcached.NewServer(":11211", &Cache{})
+    server := memcached.NewServer(":11211", &MemcachedServer{})
     server.ListenAndServe()
 }
