@@ -1,0 +1,16 @@
+# Downloading dependencies
+```
+go get
+```
+
+
+# Building
+```
+go build
+```
+
+
+# Running
+```
+./chord
+```
