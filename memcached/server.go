@@ -47,3 +47,16 @@ func (c *MemcachedServer) Set(toadd *memcached.Item) (response memcached.Memcach
 	}
 	return response
 }
+
+func (c *MemcachedServer) Delete(key string) (response memcached.MemcachedResponse) {
+	if err := c.keyvalue.Delete(key); err == nil {
+		response = &memcached.ClientErrorResponse{
+			Reason: memcached.StatusDeleted,
+		}
+	} else {
+		response = &memcached.ClientErrorResponse{
+			Reason: memcached.Error.Error(),
+		}
+	}
+	return response
+}
