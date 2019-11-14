@@ -29,9 +29,7 @@ func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse)
 		}
 		response = &memcached.ItemResponse{Item: item}
 	} else {
-		response = &memcached.ClientErrorResponse{
-			Reason: memcached.NotFound.Error(),
-		}
+		response = nil
 	}
 	return response
 }
