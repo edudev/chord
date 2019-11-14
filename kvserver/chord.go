@@ -36,8 +36,13 @@ func (c *ChordKV) Set(key string, value string) error {
 }
 
 func (c *ChordKV) Delete(key string) error {
-	// TODO: implement
-	return errors.New("Not implemented")
+	if _, ok := c.table[key]; ok {
+		delete(c.table, key)
+		return nil
+	}
+	/*Key not found*/
+	err := errors.New("Key not found")
+	return err
 }
 
 /* Create a new instance of ChordKV */
