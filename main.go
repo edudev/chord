@@ -1,12 +1,14 @@
 package main
 
 import (
-    memcached "github.com/mattrobenolt/go-memcached"
-    memcached_wrapper "github.com/edudev/chord/memcached"
+	kvserver "github.com/edudev/chord/kvserver"
+	memcached_wrapper "github.com/edudev/chord/memcached"
+	memcached "github.com/mattrobenolt/go-memcached"
 )
 
 func main() {
-    holder := memcached_wrapper.MemcachedServer{}
-    server := memcached.NewServer(":11211", &holder)
-    server.ListenAndServe()
+	backend := kvserver.New()
+	holder := memcached_wrapper.New(&backend)
+	server := memcached.NewServer(":11211", &holder)
+	server.ListenAndServe()
 }
