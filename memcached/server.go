@@ -39,7 +39,7 @@ func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse)
 func (c *MemcachedServer) Set(toadd *memcached.Item) (response memcached.MemcachedResponse) {
 	/*Note:In case of correct add we send back the Item, generic error otherwhise*/
 	if err := c.keyvalue.Set(toadd.Key, string(toadd.Value[:])); err == nil {
-		response = &memcached.ItemResponse{Item: toadd}
+		response = nil
 	} else {
 		response = &memcached.ClientErrorResponse{
 			Reason: memcached.Error.Error(),
@@ -50,9 +50,7 @@ func (c *MemcachedServer) Set(toadd *memcached.Item) (response memcached.Memcach
 
 func (c *MemcachedServer) Delete(key string) (response memcached.MemcachedResponse) {
 	if err := c.keyvalue.Delete(key); err == nil {
-		response = &memcached.ClientErrorResponse{
-			Reason: memcached.StatusDeleted,
-		}
+		response = nil
 	} else {
 		response = &memcached.ClientErrorResponse{
 			Reason: memcached.Error.Error(),
