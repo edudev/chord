@@ -1,29 +1,43 @@
 package memcached
 
 import (
-    memcached "github.com/mattrobenolt/go-memcached"
+	chord "github.com/edudev/chord/server"
+	memcached "github.com/mattrobenolt/go-memcached"
 )
 
-type MemcachedServer struct {}
+type MemcachedServer struct {
+	keyvalue chord.ChordServer
+}
 
 func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse) {
-    if key == "hello" {
-        item := &memcached.Item{
-            Key: key,
-            Value: []byte("world"),
-        }
 
-        response = &memcached.ItemResponse{Item: item}
-    } else {
-        response = &memcached.ClientErrorResponse{
-            Reason: memcached.NotFound.Error(),
-        }
-    }
+	if val, err := c.keyvalue.Get(key); err == nil {
+		item := &memcached.Item{
+			Key:   key,
+			Value: []byte(val),
+		}
+		response = &memcached.ItemResponse{Item: item}
+	} else {
+		response = &memcached.ClientErrorResponse{
+			Reason: memcached.NotFound.Error(),
+		}
+	}
+	return response
+}
 
-    return response
+func (c *MemcachedServer) Set(toadd *memcached.Item) (response memcached.MemcachedResponse) {
+	/*Note:In case of correct add we send back the Item, generic error otherwhise*/
+	if err := c.keyvalue.Set(toadd.Key, string(toadd.Value[:])); err == nil {
+		response = &memcached.ItemResponse{Item: toadd}
+	} else {
+		response = &memcached.ClientErrorResponse{
+			Reason: memcached.Error.Error(),
+		}
+	}
+	return response
 }
 
 func main() {
-    server := memcached.NewServer(":11211", &MemcachedServer{})
-    server.ListenAndServe()
+	server := memcached.NewServer(":11211", &MemcachedServer{})
+	server.ListenAndServe()
 }

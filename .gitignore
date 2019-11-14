@@ -8,6 +8,11 @@
 *.so
 *.dylib
 
+# OSX
+.DS_Store
+.AppleDouble
+.LSOverride
+
 # Test binary, build with `go test -c`
 *.test
 
