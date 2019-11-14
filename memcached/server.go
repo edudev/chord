@@ -1,12 +1,23 @@
 package memcached
 
 import (
-	chord "github.com/edudev/chord/server"
 	memcached "github.com/mattrobenolt/go-memcached"
 )
 
+type MemcachedBackend interface {
+	Get(string) (string, error)
+	Set(string, string) error
+	Delete(string) error
+}
+
 type MemcachedServer struct {
-	keyvalue chord.ChordServer
+	keyvalue MemcachedBackend
+}
+
+func New(backend MemcachedBackend) MemcachedServer {
+	return MemcachedServer{
+		keyvalue: backend,
+	}
 }
 
 func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse) {
@@ -35,9 +46,4 @@ func (c *MemcachedServer) Set(toadd *memcached.Item) (response memcached.Memcach
 		}
 	}
 	return response
-}
-
-func main() {
-	server := memcached.NewServer(":11211", &MemcachedServer{})
-	server.ListenAndServe()
 }
