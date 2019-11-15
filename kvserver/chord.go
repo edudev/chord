@@ -24,7 +24,7 @@ func (c *ChordKV) Get(key string) (string, error) {
 	return key, err
 }
 
-func (c *ChordKV) Set(key string, value string) error {
+func (c *ChordKV) Set(key, value string) error {
 	/*Check for existing key*/
 	if _, ok := c.table[key]; ok {
 		err := errors.New("Key already exists")

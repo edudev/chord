@@ -1,6 +1,8 @@
 package memcached
 
 import (
+	"log"
+
 	memcached "github.com/mattrobenolt/go-memcached"
 )
 
@@ -30,6 +32,7 @@ func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse)
 		response = &memcached.ItemResponse{Item: item}
 	} else {
 		response = nil
+		log.Printf("GET FAILED: %s | key received: %s\n", err, key)
 	}
 	return response
 }
@@ -42,6 +45,7 @@ func (c *MemcachedServer) Set(toadd *memcached.Item) (response memcached.Memcach
 		response = &memcached.ClientErrorResponse{
 			Reason: memcached.Error.Error(),
 		}
+		log.Printf("SET FAILED: %s | key-value pair received: {%s : %s}\n", response, toadd.Key, toadd.Value)
 	}
 	return response
 }
@@ -53,6 +57,7 @@ func (c *MemcachedServer) Delete(key string) (response memcached.MemcachedRespon
 		response = &memcached.ClientErrorResponse{
 			Reason: memcached.Error.Error(),
 		}
+		log.Printf("DELETE FAILED: %s | key received: %s\n", err, key)
 	}
 	return response
 }
