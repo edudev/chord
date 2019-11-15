@@ -2,20 +2,65 @@ package main
 
 import (
 	"log"
+	"fmt"
+	"sync"
 
 	kvserver "github.com/edudev/chord/kvserver"
-	memcached_wrapper "github.com/edudev/chord/memcached"
+	memcachedWrapper "github.com/edudev/chord/memcached"
 	memcached "github.com/mattrobenolt/go-memcached"
 )
 
-func main() {
-	backend := kvserver.New()
-	holder := memcached_wrapper.New(&backend)
-	server := memcached.NewServer(":11211", &holder)
+const (
+	N uint = 64
+	chordPort uint16 = 21211
+)
 
+func createNode(id uint) (server kvserver.ChordServer) {
+	addr := fmt.Sprintf("127.10.%u:%u", id, chordPort)
+	server = kvserver.New(addr)
+	return
+}
+
+func populateNodes(count uint) (servers []kvserver.ChordServer) {
+	servers = make([]kvserver.ChordServer, count)
+
+	for id := uint(0); id < count; id++ {
+		servers[id] = createNode(id+1)
+	}
+
+	for _, server := range servers {
+		server.FillFingerTable(servers)
+	}
+
+	return
+}
+
+func listenAndServe(wg *sync.WaitGroup, f func () error) {
+	wg.Add(1)
+	go func() {
+		f()
+		wg.Done()
+	}()
+}
+
+func main() {
 	log.SetPrefix("TRACE: ")
 	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
 	log.Println("log initialised")
 
-	server.ListenAndServe()
+	servers := populateNodes(N)
+	backend := servers[0]
+
+	holder := memcachedWrapper.New(&backend)
+	memcachedServer := memcached.NewServer("127.0.0.1:11211", &holder)
+
+
+	var wg sync.WaitGroup
+	listenAndServe(&wg, memcachedServer.ListenAndServe)
+
+	for _, server := range servers {
+		listenAndServe(&wg, server.ListenAndServe)
+	}
+
+	wg.Wait()
 }

@@ -4,17 +4,11 @@ import (
 	"errors"
 )
 
-type Chord interface {
-	Get(string) (string, error)
-	Set(string, string) error
-	Delete(string) error
-}
-
-type ChordKV struct {
+type chordKV struct {
 	table map[string]string
 }
 
-func (c *ChordKV) Get(key string) (string, error) {
+func (c *chordKV) get(key string) (string, error) {
 	/*Check for existing key*/
 	if val, ok := c.table[key]; ok {
 		return val, nil
@@ -24,7 +18,7 @@ func (c *ChordKV) Get(key string) (string, error) {
 	return key, err
 }
 
-func (c *ChordKV) Set(key, value string) error {
+func (c *chordKV) set(key, value string) error {
 	/*Check for existing key*/
 	if _, ok := c.table[key]; ok {
 		err := errors.New("Key already exists")
@@ -35,7 +29,7 @@ func (c *ChordKV) Set(key, value string) error {
 	return nil
 }
 
-func (c *ChordKV) Delete(key string) error {
+func (c *chordKV) delete(key string) error {
 	if _, ok := c.table[key]; ok {
 		delete(c.table, key)
 		return nil
@@ -45,9 +39,9 @@ func (c *ChordKV) Delete(key string) error {
 	return err
 }
 
-/* Create a new instance of ChordKV */
-func New() ChordKV {
-	return ChordKV{
+/* Create a new instance of chordKV */
+func newChordKV() chordKV {
+	return chordKV{
 		table: make(map[string]string),
 	}
 }
