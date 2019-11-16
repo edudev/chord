@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package server;
+
+
+service ChordKV {
+  rpc Get (GetRequest) returns (GetReply) {}
+  rpc Set (SetRequest) returns (SetReply) {}
+  rpc Delete (DeleteRequest) returns (DeleteReply) {}
+}
+
+message GetRequest {
+  bytes position = 1;
+  string key = 2;
+}
+
+message GetReply {
+  string value = 1;
+}
+
+message SetRequest {
+  bytes position = 1;
+  string key = 2;
+  string value = 3;
+}
+
+message SetReply {
+}
+
+message DeleteRequest {
+  bytes position = 1;
+  string key = 2;
+}
+
+message DeleteReply {
+}

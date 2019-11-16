@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	kvserver "github.com/edudev/chord/kvserver"
+	kvserver "github.com/edudev/chord/server"
 	memcachedWrapper "github.com/edudev/chord/memcached"
 	memcached "github.com/mattrobenolt/go-memcached"
 )
@@ -16,7 +16,7 @@ const (
 )
 
 func createNode(id uint) (server kvserver.ChordServer) {
-	addr := fmt.Sprintf("127.10.%u:%u", id, chordPort)
+	addr := fmt.Sprintf("127.10.0.%d:%d", id, chordPort)
 	server = kvserver.New(addr)
 	return
 }

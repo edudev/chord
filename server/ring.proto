@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package server;
+
+
+service ChordRing {
+  rpc GetSuccessor (google.protobuf.Empty) returns (RPCNode) {}
+  rpc ClosestPrecedingFinger (LookupRequest) returns (RPCNode) {}
+}
+
+message LookupRequest {
+  bytes position = 1;
+}
+
+message RPCNode {
+  string address = 1;
+  bytes position = 2;
+}
