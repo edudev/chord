@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 MEMCACHED_VER="1.5.20"
 MEMTIER_B_VER="1.2.17"
