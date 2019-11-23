@@ -11,6 +11,9 @@ import (
 )
 
 const (
+	// M as it is used in the paper. M specifies the size of the identifier ring,
+	// which is 2^M in size (M specifies the amount of bits in an identifier).
+	// It is chosen to be the amount of bits we receive from the hashing function.
 	M uint = hash.Size * 8
 )
 
@@ -25,13 +28,13 @@ func cmpPosition(a position, b position) int {
 
 type node struct {
 	addr address
-	pos position
+	pos  position
 }
 
 type chordRing struct {
 	server *ChordServer
 
-	myNode node
+	myNode      node
 	fingerTable [M]node
 
 	UnimplementedChordRingServer
@@ -116,12 +119,12 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor node) {
 	return node{}
 }
 
-func (c *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
+func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
 	// TODO: return the current node's successor
 	return &RPCNode{}, nil
 }
 
-func (c *chordRing) ClosestPrecedingFinger(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
+func (r *chordRing) ClosestPrecedingFinger(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
 	// TODO: return the successor node, for now
 	return &RPCNode{}, nil
 }
