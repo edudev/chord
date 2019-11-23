@@ -9,7 +9,7 @@ import (
 
 type chordKV struct {
 	server *ChordServer
-	table map[string]string
+	table  map[string]string
 
 	UnimplementedChordKVServer
 }
@@ -25,11 +25,6 @@ func (c *chordKV) localGet(key string) (string, error) {
 }
 
 func (c *chordKV) localSet(key, value string) error {
-	/*Check for existing key*/
-	if _, ok := c.table[key]; ok {
-		err := errors.New("Key already exists")
-		return err
-	}
 	/*Save key/value*/
 	c.table[key] = value
 	return nil
@@ -49,7 +44,7 @@ func (c *chordKV) localDelete(key string) error {
 func newChordKV(server *ChordServer, grpcServer *grpc.Server) chordKV {
 	kvstore := chordKV{
 		server: server,
-		table: make(map[string]string),
+		table:  make(map[string]string),
 	}
 
 	RegisterChordKVServer(grpcServer, &kvstore)
