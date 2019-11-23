@@ -1,22 +1,22 @@
 package main
 
 import (
-	"log"
 	"fmt"
+	"log"
 	"sync"
 
-	kvserver "github.com/edudev/chord/server"
 	memcachedWrapper "github.com/edudev/chord/memcached"
+	kvserver "github.com/edudev/chord/server"
 	memcached "github.com/mattrobenolt/go-memcached"
 )
 
 const (
-	N uint = 64
+	N         uint   = 64
 	chordPort uint16 = 21211
 )
 
 func createNode(id uint) (server kvserver.ChordServer) {
-	addr := fmt.Sprintf("127.10.0.%d:%d", id, chordPort)
+	addr := fmt.Sprintf("127.0.0.1:%d", chordPort+uint16(id))
 	server = kvserver.New(addr)
 	return
 }
@@ -25,7 +25,7 @@ func populateNodes(count uint) (servers []kvserver.ChordServer) {
 	servers = make([]kvserver.ChordServer, count)
 
 	for id := uint(0); id < count; id++ {
-		servers[id] = createNode(id+1)
+		servers[id] = createNode(id + 1)
 	}
 
 	for _, server := range servers {
@@ -35,7 +35,7 @@ func populateNodes(count uint) (servers []kvserver.ChordServer) {
 	return
 }
 
-func listenAndServe(wg *sync.WaitGroup, f func () error) {
+func listenAndServe(wg *sync.WaitGroup, f func() error) {
 	wg.Add(1)
 	go func() {
 		f()
@@ -53,7 +53,6 @@ func main() {
 
 	holder := memcachedWrapper.New(&backend)
 	memcachedServer := memcached.NewServer("127.0.0.1:11211", &holder)
-
 
 	var wg sync.WaitGroup
 	listenAndServe(&wg, memcachedServer.ListenAndServe)
