@@ -16,7 +16,7 @@ const (
 )
 
 func createNode(id uint) (server kvserver.ChordServer) {
-	addr := fmt.Sprintf("127.0.0.1:%d", chordPort)
+	addr := fmt.Sprintf("127.0.0.1:%d", chordPort+uint16(id))
 	server = kvserver.New(addr)
 	return
 }
