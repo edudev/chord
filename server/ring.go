@@ -3,16 +3,25 @@ package server
 import (
 	"context"
 	hash "crypto/sha1"
+	"math/big"
+	"sort"
 
-	"google.golang.org/grpc"
 	"github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/grpc"
 )
 
 const (
 	M uint = hash.Size * 8
 )
 
-type position [M/8]byte
+// a position should be treated as an opague value.
+// however, for the finger table operations, it is useful to treat it as a number.
+type position *big.Int
+
+// compares to positions / spaceship operator
+func cmpPosition(a position, b position) int {
+	return ((*big.Int)(a)).Cmp((*big.Int)(b))
+}
 
 type node struct {
 	addr address
@@ -29,9 +38,14 @@ type chordRing struct {
 }
 
 func addr2node(addr address) node {
+	var pos big.Int
+	// the ordering of bytes shouldn't matter as long as it is consistent.
+	// SetBytes treats the number as unsigned.
+	hash := hash.Sum([]byte(addr))
+	pos.SetBytes(hash[:])
 	return node{
 		addr: addr,
-		pos: position(hash.Sum([]byte(addr))),
+		pos:  position(&pos),
 	}
 }
 
@@ -63,8 +77,32 @@ func (r *chordRing) getClient(addr address) (client ChordRingClient) {
 	return
 }
 
+type sortByPosition []ChordServer
+
+func (a sortByPosition) Len() int      { return len(a) }
+func (a sortByPosition) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a sortByPosition) Less(i, j int) bool {
+	return cmpPosition(a[i].ring.myNode.pos, a[j].ring.myNode.pos) == -1
+}
+
 func (r *chordRing) fillFingerTable(servers []ChordServer) {
-	// TODO: fill the first entry of the finger table (i.e. the successor)
+	sort.Sort(sortByPosition(servers))
+	for _, s := range servers {
+		if cmpPosition(s.ring.myNode.pos, r.myNode.pos) == 1 {
+			// s is the first node that is a successor to us.
+			r.fingerTable[0] = s.ring.myNode
+			break
+		}
+	}
+	// if we couldn't find a successor yet we need to wrap.
+	if (cmpPosition(servers[0].ring.myNode.pos, r.myNode.pos)) == 0 {
+		// there is no successor
+	} else {
+		// the succesor is the next element after wrapping,
+		// therefore the first element in the sorted array.
+		r.fingerTable[0] = servers[0].ring.myNode
+	}
+	// TODO: fill the rest of the table (will be done in a separate pull/commit)
 }
 
 func (r *chordRing) findSuccessor(keyPos position) (successor node) {
