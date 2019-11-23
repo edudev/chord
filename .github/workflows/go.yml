@@ -29,8 +29,11 @@ jobs:
               curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
               dep ensure
           fi
-          sudo apt install protobuf-compiler
-          protoc --version
+
+      - name: Install Protoc
+        uses: Arduino/actions/setup-protoc@master
+        with:
+          version: "3.x"
 
       - name: Build Protocol Buffers
         run: protoc -I server/ server/*.proto --go_out=plugins=grpc:server
