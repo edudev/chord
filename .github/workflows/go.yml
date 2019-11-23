@@ -35,6 +35,9 @@ jobs:
         with:
           version: "3.x"
 
+      - name: Install protoc-gen-go
+        run: go get -u github.com/golang/protobuf/protoc-gen-go
+
       - name: Build Protocol Buffers
         run: protoc -I server/ server/*.proto --go_out=plugins=grpc:server
 
