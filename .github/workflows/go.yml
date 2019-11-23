@@ -30,6 +30,7 @@ jobs:
               dep ensure
           fi
           sudo apt install protobuf-compiler
+          protoc --version
 
       - name: Build Protocol Buffers
         run: protoc -I server/ server/*.proto --go_out=plugins=grpc:server
