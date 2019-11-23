@@ -6,7 +6,7 @@ MEMTIER_B_VER="1.2.17"
 LMEMCACHED_VER="1.0.18"
 
 mkdir -p $HOME/opt/
-mkdir -p $HOME/opt/local
+mkdir $HOME/opt/local
 
 cd $HOME
 wget https://dl.google.com/go/go$GO_VER.tar.gz
