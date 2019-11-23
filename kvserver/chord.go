@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"sync"
 )
 
 type Chord interface {
@@ -11,13 +12,13 @@ type Chord interface {
 }
 
 type ChordKV struct {
-	table map[string]string
+	table sync.Map
 }
 
 func (c *ChordKV) Get(key string) (string, error) {
 	/*Check for existing key*/
-	if val, ok := c.table[key]; ok {
-		return val, nil
+	if val, ok := c.table.Load(key); ok {
+		return val.(string), nil
 	}
 	/*Key not found*/
 	err := errors.New("Key not found")
@@ -25,19 +26,14 @@ func (c *ChordKV) Get(key string) (string, error) {
 }
 
 func (c *ChordKV) Set(key, value string) error {
-	/*Check for existing key*/
-	if _, ok := c.table[key]; ok {
-		err := errors.New("Key already exists")
-		return err
-	}
 	/*Save key/value*/
-	c.table[key] = value
+	c.table.Store(key, value)
 	return nil
 }
 
 func (c *ChordKV) Delete(key string) error {
-	if _, ok := c.table[key]; ok {
-		delete(c.table, key)
+	if _, ok := c.table.Load(key); ok {
+		c.table.Delete(key)
 		return nil
 	}
 	/*Key not found*/
@@ -48,6 +44,6 @@ func (c *ChordKV) Delete(key string) error {
 /* Create a new instance of ChordKV */
 func New() ChordKV {
 	return ChordKV{
-		table: make(map[string]string),
+		//	table: make(map[string]string),
 	}
 }

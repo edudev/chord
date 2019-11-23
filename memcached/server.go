@@ -29,6 +29,7 @@ func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse)
 			Key:   key,
 			Value: []byte(val),
 		}
+		log.Printf("GET SUCCEEDED | key received: %s\n", key)
 		response = &memcached.ItemResponse{Item: item}
 	} else {
 		response = nil
@@ -38,15 +39,8 @@ func (c *MemcachedServer) Get(key string) (response memcached.MemcachedResponse)
 }
 
 func (c *MemcachedServer) Set(toadd *memcached.Item) (response memcached.MemcachedResponse) {
-	/*Note:In case of correct add we send back the Item, generic error otherwhise*/
-	if err := c.keyvalue.Set(toadd.Key, string(toadd.Value[:])); err == nil {
-		response = nil
-	} else {
-		response = &memcached.ClientErrorResponse{
-			Reason: memcached.Error.Error(),
-		}
-		log.Printf("SET FAILED: %s | key-value pair received: {%s : %s}\n", response, toadd.Key, toadd.Value)
-	}
+	c.keyvalue.Set(toadd.Key, string(toadd.Value[:]))
+	response = nil
 	return response
 }
 
