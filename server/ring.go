@@ -85,13 +85,13 @@ type sortByPosition []ChordServer
 func (a sortByPosition) Len() int      { return len(a) }
 func (a sortByPosition) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a sortByPosition) Less(i, j int) bool {
-	return cmpPosition(a[i].ring.myNode.pos, a[j].ring.myNode.pos) == -1
+	return cmpPosition(a[i].ring.myNode.pos, a[j].ring.myNode.pos) < 0
 }
 
 func (r *chordRing) fillFingerTable(servers []ChordServer) {
 	sort.Sort(sortByPosition(servers))
 	for _, s := range servers {
-		if cmpPosition(s.ring.myNode.pos, r.myNode.pos) == 1 {
+		if cmpPosition(s.ring.myNode.pos, r.myNode.pos) > 0 {
 			// s is the first node that is a successor to us.
 			r.fingerTable[0] = s.ring.myNode
 			break
