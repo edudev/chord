@@ -13,6 +13,8 @@ mkdir $HOME/opt/local
 #wget https://dl.google.com/go/go$GO_VER.tar.gz
 #tar -C $HOME/opt/local -xzf go$GO_VER.tar.gz
 #export PATH=$PATH:$HOME/opt/local/go/bin
+#cd $HOME/go/src/github.com/edudev
+#git clone https://github.com/edudev/chord.git
 #cd $HOME
 #ln -s $HOME/go/src/github.com/edudev/chord remote/
 #rm -rf go$GO_VER.tar.gz
