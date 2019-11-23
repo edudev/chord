@@ -6,7 +6,7 @@ TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
 
 module load prun
 
-CHORD_EXEC="$HOME/chord/chord"
+CHORD_EXEC="$HOME/remote/chord"
 CHORD_ARGS=""
 echo "Starting Chord..."
 prun -v -np 1 $CHORD_EXEC $CHORD_ARGS < /dev/null >$HOME/chord_out_$TIMESTAMP 2>$HOME/tmpout &

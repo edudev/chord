@@ -1,20 +1,21 @@
 #!/bin/bash
 
-GO_VER="1.13.4.linux-amd64"
+#GO_VER="1.13.4.linux-amd64"
 MEMCACHED_VER="1.5.20"
 MEMTIER_B_VER="1.2.17"
 LMEMCACHED_VER="1.0.18"
 
 mkdir -p $HOME/opt/
-mkdir -p $HOME/go/src/github.com/edudev
+#mkdir -p $HOME/go/src/github.com/edudev
 mkdir $HOME/opt/local
 
-cd $HOME
-wget https://dl.google.com/go/go$GO_VER.tar.gz
-tar -C $HOME/opt/local -xzf go$GO_VER.tar.gz
-export PATH=$PATH:$HOME/opt/local/go/bin
-cd $HOME
-rm -rf go$GO_VER.tar.gz
+#cd $HOME
+#wget https://dl.google.com/go/go$GO_VER.tar.gz
+#tar -C $HOME/opt/local -xzf go$GO_VER.tar.gz
+#export PATH=$PATH:$HOME/opt/local/go/bin
+#cd $HOME
+#ln -s $HOME/go/src/github.com/edudev/chord remote/
+#rm -rf go$GO_VER.tar.gz
 
 cd $HOME
 wget http://www.memcached.org/files/memcached-$MEMCACHED_VER.tar.gz
