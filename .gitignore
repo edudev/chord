@@ -24,3 +24,6 @@
 
 # protocol buffers
 *.pb.go
+
+# vscode configuration files
+/.vscode
