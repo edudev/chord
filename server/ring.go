@@ -125,15 +125,9 @@ func (r *chordRing) fillFingerTable(servers []ChordServer) {
 			}
 		}
 		if !foundNode {
-			// if we couldn't find a successor yet we need to wrap.
-			if (cmpPosition(servers[0].ring.myNode.pos, r.myNode.pos)) == 0 {
-				// there is no successor
-				panic("Could not find successor")
-			} else {
-				// the succesor is the next element after wrapping,
-				// therefore the first element in the sorted array.
-				r.fingerTable[k] = servers[0].ring.myNode
-			}
+			// the succesor is the next element after wrapping,
+			// therefore the first element in the sorted array.
+			r.fingerTable[k] = servers[0].ring.myNode
 		}
 	}
 }
