@@ -165,7 +165,7 @@ func rpcNode2node(rpc *RPCNode) node {
 func node2rpcNode(n node) *RPCNode {
 	ret := new(RPCNode)
 	ret.Address = string(n.addr)
-	ret.Position = (*big.Int)(n.pos).Bytes()
+	ret.Position = position2bytes(n.pos)
 	return ret
 }
 
