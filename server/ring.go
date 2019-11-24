@@ -40,15 +40,23 @@ type chordRing struct {
 	UnimplementedChordRingServer
 }
 
-func addr2node(addr address) node {
+func bytes2position(bytes []byte) position {
 	var pos big.Int
+	pos.SetBytes(bytes)
+	return position(&pos)
+}
+
+func position2bytes(pos position) []byte {
+	return (*big.Int)(pos).Bytes()
+}
+
+func addr2node(addr address) node {
 	// the ordering of bytes shouldn't matter as long as it is consistent.
 	// SetBytes treats the number as unsigned.
-	hash := hash.Sum([]byte(addr))
-	pos.SetBytes(hash[:])
+	h := hash.Sum([]byte(addr))
 	return node{
 		addr: addr,
-		pos:  position(&pos),
+		pos:  bytes2position(h[:]),
 	}
 }
 
@@ -112,23 +120,59 @@ func (r *chordRing) fillFingerTable(servers []ChordServer) {
 	// TODO: fill the rest of the table (will be done in a separate pull/commit)
 }
 
-func (r *chordRing) findSuccessor(keyPos position) (successor node) {
-	// TODO: find predecessor, then return his successor
-	return node{}
+func (r *chordRing) findSuccessor(keyPos position) (successor *node, e error) {
+	predecessor, e := r.findPredecessor(keyPos)
+	if e != nil {
+		return nil, e
+	}
+	successorRPC, e := r.getClient(predecessor.addr).GetSuccessor(context.TODO(), new(empty.Empty))
+	if e != nil {
+		return nil, e
+	}
+	n := rpcNode2node(successorRPC)
+	return &n, nil
 }
 
-func (r *chordRing) findPredecessor(keyPos position) (predecessor node) {
+// checks whether keyPos € (p, successor]
+func isSuccessorResponsibleForPosition(p position, keyPos position, successor position) bool {
+	return cmpPosition(keyPos, p) > 0 && cmpPosition(keyPos, successor) <= 0
+}
+
+func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error) {
 	// TODO: iteratively ask nodes (rpc) until we get a node for which keyPos
 	// is between (node, nodeSuccessor]
-	return node{}
+	n := r.myNode
+	successor := r.fingerTable[0]
+	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
+		n = successor
+		successorRpc, e := r.getClient(n.addr).GetSuccessor(context.TODO(), new(empty.Empty))
+		if e != nil {
+			// TODO what to do here?
+			return nil, e
+		}
+		successor = rpcNode2node(successorRpc)
+	}
+	return &n, nil
+}
+
+func rpcNode2node(rpc *RPCNode) node {
+	return node{
+		addr: address(rpc.GetAddress()),
+		pos:  bytes2position(rpc.GetPosition()),
+	}
+}
+
+func node2rpcNode(n node) *RPCNode {
+	ret := new(RPCNode)
+	ret.Address = string(n.addr)
+	ret.Position = (*big.Int)(n.pos).Bytes()
+	return ret
 }
 
 func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
-	// TODO: return the current node's successor
-	return &RPCNode{}, nil
+	return node2rpcNode(r.fingerTable[0]), nil
 }
 
 func (r *chordRing) ClosestPrecedingFinger(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
-	// TODO: return the successor node, for now
-	return &RPCNode{}, nil
+	return node2rpcNode(r.fingerTable[0]), nil
 }
