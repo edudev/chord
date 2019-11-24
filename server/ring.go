@@ -186,10 +186,21 @@ func node2rpcNode(n node) *RPCNode {
 	return ret
 }
 
+// finds the closest predecessor for keyPosition in our local finger table
+func (r *chordRing) fingerTableClosestPredecessor(keyPosition position) node {
+	for i := uint(0); i < M-1; i++ {
+		if isSuccessorResponsibleForPosition(r.fingerTable[i].pos, keyPosition, r.fingerTable[i+1].pos) {
+			return r.fingerTable[i]
+		}
+	}
+	return r.fingerTable[M-1]
+}
+
 func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
 	return node2rpcNode(r.fingerTable[0]), nil
 }
 
 func (r *chordRing) ClosestPrecedingFinger(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
-	return node2rpcNode(r.fingerTable[0]), nil
+	keyPosition := bytes2position(in.GetPosition())
+	return node2rpcNode(r.fingerTableClosestPredecessor(keyPosition)), nil
 }
