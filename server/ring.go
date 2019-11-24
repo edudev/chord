@@ -145,12 +145,12 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 	successor := r.fingerTable[0]
 	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
 		n = successor
-		successorRpc, e := r.getClient(n.addr).GetSuccessor(context.Background(), new(empty.Empty))
+		successorRPC, e := r.getClient(n.addr).GetSuccessor(context.Background(), new(empty.Empty))
 		if e != nil {
 			// TODO what to do here?
 			return nil, e
 		}
-		successor = rpcNode2node(successorRpc)
+		successor = rpcNode2node(successorRPC)
 	}
 	return &n, nil
 }
