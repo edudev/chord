@@ -90,20 +90,24 @@ func (a sortByPosition) Less(i, j int) bool {
 
 func (r *chordRing) fillFingerTable(servers []ChordServer) {
 	sort.Sort(sortByPosition(servers))
+	foundNode := false
 	for _, s := range servers {
 		if cmpPosition(s.ring.myNode.pos, r.myNode.pos) > 0 {
 			// s is the first node that is a successor to us.
 			r.fingerTable[0] = s.ring.myNode
+			foundNode = true
 			break
 		}
 	}
-	// if we couldn't find a successor yet we need to wrap.
-	if (cmpPosition(servers[0].ring.myNode.pos, r.myNode.pos)) == 0 {
-		// there is no successor
-	} else {
-		// the succesor is the next element after wrapping,
-		// therefore the first element in the sorted array.
-		r.fingerTable[0] = servers[0].ring.myNode
+	if !foundNode {
+		// if we couldn't find a successor yet we need to wrap.
+		if (cmpPosition(servers[0].ring.myNode.pos, r.myNode.pos)) == 0 {
+			// there is no successor
+		} else {
+			// the succesor is the next element after wrapping,
+			// therefore the first element in the sorted array.
+			r.fingerTable[0] = servers[0].ring.myNode
+		}
 	}
 	// TODO: fill the rest of the table (will be done in a separate pull/commit)
 }
