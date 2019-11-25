@@ -40,10 +40,9 @@ type chordRing struct {
 	UnimplementedChordRingServer
 }
 
-func bytes2position(bytes []byte) position {
-	var pos big.Int
-	pos.SetBytes(bytes)
-	return position(&pos)
+func bytes2position(bytes []byte) (pos position) {
+	(*big.Int)(pos).SetBytes(bytes)
+	return
 }
 
 func position2bytes(pos position) []byte {
@@ -88,6 +87,41 @@ func (r *chordRing) getClient(addr address) (client ChordRingClient) {
 	return
 }
 
+// calculates n + 2^k mod (2^M - 1)
+func (r *chordRing) calculateFingerTablePosition(k uint) position {
+	// n is our node position (as in the paper)
+	n := r.myNode.pos
+	// one = 1
+	one := big.NewInt(1)
+	// max = 2^M - 1
+	var max big.Int
+	max.Lsh(one, M)
+	max.Sub(&max, one)
+	q := new(big.Int)
+	// q = 2^k
+	q.Lsh(one, k)
+	// q = n + q = n + 2^k
+	q.Add(q, n)
+	// q = q AND max = q mod max = q mod (2^M - 1) = n + 2^k mod (2^M - 1)
+	q.And(q, &max)
+	return position(q)
+}
+
+// finds the successor to the given position in the given array of servers
+func (r *chordRing) successorToPositionInServers(servers []ChordServer, p position) ChordServer {
+	// n is our node position (as in the paper)
+	n := r.myNode.pos
+	for _, s := range servers {
+		// find the next node that is larger than q
+		if cmpPosition(p, n) < 0 {
+			return s
+		}
+	}
+	// the succesor is the next element after wrapping,
+	// therefore the first element in the sorted array.
+	return servers[0]
+}
+
 type sortByPosition []ChordServer
 
 func (a sortByPosition) Len() int      { return len(a) }
@@ -98,37 +132,9 @@ func (a sortByPosition) Less(i, j int) bool {
 
 func (r *chordRing) fillFingerTable(servers []ChordServer) {
 	sort.Sort(sortByPosition(servers))
-
-	// n is our node position (as in the paper)
-	n := (*big.Int)(r.myNode.pos)
-	// one = 1
-	one := big.NewInt(1)
-	// max = 2^M - 1
-	var max big.Int
-	max.Lsh(one, M)
-	max.Sub(&max, one)
 	for k := uint(0); k < M; k++ {
-		// q = 2^k
-		var q big.Int
-		q.Lsh(one, k)
-		// q = n + q = n + 2^k
-		q.Add(&q, n)
-		// q = q AND max = q mod max = q mod (2^M - 1) = n + 2^k mod (2^M - 1)
-		q.And(&q, &max)
-		foundNode := false
-		for _, s := range servers {
-			// find the next node that is larger than q
-			if q.Cmp((*big.Int)(s.ring.myNode.pos)) < 0 {
-				r.fingerTable[k] = s.ring.myNode
-				foundNode = true
-				break
-			}
-		}
-		if !foundNode {
-			// the succesor is the next element after wrapping,
-			// therefore the first element in the sorted array.
-			r.fingerTable[k] = servers[0].ring.myNode
-		}
+		q := r.calculateFingerTablePosition(k)
+		r.fingerTable[k] = r.successorToPositionInServers(servers, q).ring.myNode
 	}
 }
 
@@ -141,7 +147,7 @@ func (r *chordRing) findSuccessor(keyPos position) (successor *node, e error) {
 	if e != nil {
 		return nil, e
 	}
-	n := rpcNode2node(successorRPC)
+	n := successorRPC.node()
 	return &n, nil
 }
 
@@ -151,35 +157,33 @@ func isSuccessorResponsibleForPosition(p position, keyPos position, successor po
 }
 
 func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error) {
-	// TODO: iteratively ask nodes (rpc) until we get a node for which keyPos
+	// iteratively ask nodes (rpc) until we get a node for which keyPos
 	// is between (node, nodeSuccessor]
 	n := r.myNode
 	successor := r.fingerTable[0]
 	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
 		nRPC, e := r.getClient(n.addr).ClosestPrecedingFinger(context.Background(), &LookupRequest{Position: position2bytes(keyPos)})
 		if e != nil {
-			// TODO what to do here?
 			return nil, e
 		}
-		n = rpcNode2node(nRPC)
+		n = nRPC.node()
 		successorRPC, e := r.getClient(n.addr).GetSuccessor(context.Background(), new(empty.Empty))
 		if e != nil {
-			// TODO what to do here?
 			return nil, e
 		}
-		successor = rpcNode2node(successorRPC)
+		successor = successorRPC.node()
 	}
 	return &n, nil
 }
 
-func rpcNode2node(rpc *RPCNode) node {
+func (rpc *RPCNode) node() node {
 	return node{
 		addr: address(rpc.GetAddress()),
 		pos:  bytes2position(rpc.GetPosition()),
 	}
 }
 
-func node2rpcNode(n node) *RPCNode {
+func (n node) rpcNode() *RPCNode {
 	ret := new(RPCNode)
 	ret.Address = string(n.addr)
 	ret.Position = position2bytes(n.pos)
@@ -197,10 +201,10 @@ func (r *chordRing) fingerTableClosestPredecessor(keyPosition position) node {
 }
 
 func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
-	return node2rpcNode(r.fingerTable[0]), nil
+	return r.fingerTable[0].rpcNode(), nil
 }
 
 func (r *chordRing) ClosestPrecedingFinger(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
 	keyPosition := bytes2position(in.GetPosition())
-	return node2rpcNode(r.fingerTableClosestPredecessor(keyPosition)), nil
+	return r.fingerTableClosestPredecessor(keyPosition).rpcNode(), nil
 }
