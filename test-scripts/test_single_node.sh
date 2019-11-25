@@ -16,7 +16,7 @@ NODE="$(grep -o -P "node.{0,3}" $HOME/tmpout)"
 echo "Chord started on $NODE."
 echo "Output of Chord: $HOME/chord_out_$TIMESTAMP"
 
-MEMTIER_B_EXEC="env -i $HOME/opt/bin/memtier_benchmark"
+MEMTIER_B_EXEC="$HOME/opt/bin/memtier_benchmark"
 #Memtier using 1 thread 1 client
 MEMTIER_B_ARGS="-s $NODE -p 11211 -P memcache_text -x 1 -t 1 -c 1"
 echo "Running Memtier Benchmark..."

@@ -17,7 +17,7 @@ NODE="$(grep -o -P "node.{0,3}" $HOME/tmpout)"
 echo "Memcached started on $NODE."
 echo "Output of Memcached: $HOME/memcached_out_$TIMESTAMP"
 
-MEMTIER_B_EXEC="env -i $HOME/opt/bin/memtier_benchmark"
+MEMTIER_B_EXEC="$HOME/opt/bin/memtier_benchmark"
 MEMTIER_B_ARGS="-s $NODE -p 11211 -P memcache_text -x 1"
 echo "Running Memtier Benchmark..."
 prun -np 1 $MEMTIER_B_EXEC $MEMTIER_B_ARGS </dev/null >$HOME/memtier_out_$TIMESTAMP 2>&1
