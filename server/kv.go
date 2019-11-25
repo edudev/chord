@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"google.golang.org/grpc"
 )
@@ -10,8 +11,13 @@ import (
 type chordKV struct {
 	server *ChordServer
 	table  map[string]string
+	lock   *sync.RWMutex
 
 	UnimplementedChordKVServer
+}
+
+func key2position(key string) position {
+	return bytes2position([]byte(key))
 }
 
 func (c *chordKV) localGet(key string) (string, error) {
@@ -58,32 +64,86 @@ func (c *chordKV) getClient(addr address) (client ChordKVClient) {
 	return
 }
 
-func (c *chordKV) Get(ctx context.Context, in *GetRequest) (*GetReply, error) {
-	// TODO: do a local get
-	return &GetReply{}, nil
+func (c *chordKV) Get(ctx context.Context, in *GetRequest) (reply *GetReply, err error) {
+	key := in.GetKey()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	value, err := c.localGet(key)
+
+	if err != nil {
+		return
+	}
+
+	return &GetReply{Value: value}, nil
 }
 
-func (c *chordKV) Set(ctx context.Context, in *SetRequest) (*SetReply, error) {
-	// TODO: do a local set
-	return &SetReply{}, nil
+func (c *chordKV) Set(ctx context.Context, in *SetRequest) (reply *SetReply, err error) {
+	key := in.GetKey()
+	value := in.GetValue()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if err = c.localSet(key, value); err != nil {
+		return
+	}
+
+	reply = &SetReply{}
+	return
 }
 
-func (c *chordKV) Delete(ctx context.Context, in *DeleteRequest) (*DeleteReply, error) {
-	// TODO: do a local delete
-	return &DeleteReply{}, nil
+func (c *chordKV) Delete(ctx context.Context, in *DeleteRequest) (reply *DeleteReply, err error) {
+	key := in.GetKey()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if err = c.localDelete(key); err != nil {
+		return
+	}
+
+	reply = &DeleteReply{}
+	return
 }
 
-func (c *chordKV) remoteGet(remoteNode address, key string) (string, error) {
-	// TODO: execute rpc
-	return "", nil
+func (c *chordKV) remoteGet(remoteNode address, key string) (value string, err error) {
+	keyPos := key2position(key)
+	getRequest := &GetRequest{Key: key, Position: position2bytes(keyPos)}
+	getReply, err := c.getClient(remoteNode).Get(context.Background(), getRequest)
+	if err != nil {
+		return
+	}
+
+	return getReply.GetValue(), nil
 }
 
-func (c *chordKV) remoteSet(remoteNode address, key string, value string) error {
-	// TODO: execute rpc
-	return nil
+func (c *chordKV) remoteSet(remoteNode address, key string, value string) (err error) {
+	keyPos := key2position(key)
+	setRequest := &SetRequest{
+		Key:      key,
+		Value:    value,
+		Position: position2bytes(keyPos),
+	}
+
+	_, err = c.getClient(remoteNode).Set(context.Background(), setRequest)
+
+	if err != nil {
+		return
+	}
+
+	return
 }
 
-func (c *chordKV) remoteDelete(remoteNode address, key string) error {
-	// TODO: execute rpc
-	return nil
+func (c *chordKV) remoteDelete(remoteNode address, key string) (err error) {
+	keyPos := key2position(key)
+	deleteRequest := &DeleteRequest{
+		Key:      key,
+		Position: position2bytes(keyPos),
+	}
+
+	_, err = c.getClient(remoteNode).Delete(context.Background(), deleteRequest)
+
+	if err != nil {
+		return
+	}
+
+	return
 }
