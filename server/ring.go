@@ -59,15 +59,15 @@ func addr2node(addr address) node {
 	}
 }
 
-func (r *chordRing) lookup(key string) (addr address) {
-	// TODO: calculate the right position
-	// keyPos := position([M/8]byte{})
-	// node := r.findSuccessor(keyPos)
-	// return node.addr
+func (r *chordRing) lookup(key string) address {
+	h := hash.Sum([]byte(key))
+	keyPos := bytes2position(h[:])
 
-	// TODO: based on the finger table and do a lookup
-	// repeat until (current, successor) is found
-	return r.myNode.addr
+	node, e := r.findSuccessor(keyPos)
+	if e != nil {
+		panic("whhhhhaaaaaaaa")
+	}
+	return node.addr
 }
 
 func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Server) chordRing {
