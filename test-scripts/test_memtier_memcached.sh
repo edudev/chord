@@ -1,4 +1,7 @@
 #!/bin/bash
+
+#Run 4 memcached server and test them individually with memtier
+
 trap "kill 0" EXIT
 
 TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"

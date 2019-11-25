@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#Build and prepary remote dir for DAS5
+
 mkdir remote
 cp test-scripts/* remote/
 if [[ "$OSTYPE" == "darwin"* ]]; then

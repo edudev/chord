@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#Install script for DAS5
+
 #GO_VER="1.13.4.linux-amd64"
 MEMCACHED_VER="1.5.20"
 MEMTIER_B_VER="1.2.17"

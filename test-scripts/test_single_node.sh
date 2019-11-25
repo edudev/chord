@@ -1,4 +1,7 @@
 #!/bin/bash
+
+#Run first release of chord and test it with memtier and memslap
+
 trap "exit" INT TERM ERR
 trap "kill 0" EXIT
 

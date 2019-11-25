@@ -1,4 +1,7 @@
 #!/bin/bash
+
+#Run a single memcached server and benchmark it with memtier and memslap
+
 trap "exit" INT TERM ERR
 trap "kill 0" EXIT
 
