@@ -16,10 +16,6 @@ type chordKV struct {
 	UnimplementedChordKVServer
 }
 
-func key2position(key string) position {
-	return bytes2position([]byte(key))
-}
-
 func (c *chordKV) localGet(key string) (string, error) {
 	/*Check for existing key*/
 	if val, ok := c.table[key]; ok {
