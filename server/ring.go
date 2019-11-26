@@ -43,8 +43,15 @@ type chordRing struct {
 }
 
 func bytes2position(bytes []byte) (pos position) {
+	// the ordering of bytes shouldn't matter as long as it is consistent.
+	// SetBytes treats the number as unsigned.
 	(*big.Int)(pos).SetBytes(bytes)
 	return
+}
+
+func key2position(key string) position {
+	h := hash.Sum([]byte(key))
+	return bytes2position(h[:])
 }
 
 func position2bytes(pos position) []byte {
@@ -52,24 +59,22 @@ func position2bytes(pos position) []byte {
 }
 
 func addr2node(addr address) node {
-	// the ordering of bytes shouldn't matter as long as it is consistent.
-	// SetBytes treats the number as unsigned.
-	h := hash.Sum([]byte(addr))
 	return node{
 		addr: addr,
-		pos:  bytes2position(h[:]),
+		pos:  key2position(string(addr)),
 	}
 }
 
-func (r *chordRing) lookup(key string) address {
-	h := hash.Sum([]byte(key))
-	keyPos := bytes2position(h[:])
+func (r *chordRing) lookup(key string) (addr address, err error) {
+	keyPos := key2position(key)
 
-	node, e := r.findSuccessor(keyPos)
-	if e != nil {
-		panic("whhhhhaaaaaaaa")
+	node, err := r.findSuccessor(keyPos)
+	if err != nil {
+		return
 	}
-	return node.addr
+
+	addr = node.addr
+	return
 }
 
 func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Server) chordRing {

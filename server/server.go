@@ -10,26 +10,39 @@ import (
 type address string
 
 type ChordServer struct {
-	ring *chordRing
+	ring    *chordRing
 	kvstore *chordKV
 
-	listener *net.Listener
-	grpcServer *grpc.Server
+	listener    *net.Listener
+	grpcServer  *grpc.Server
 	clientCache map[address]*grpc.ClientConn
 }
 
-func (s *ChordServer) Get(key string) (string, error) {
-	remoteNode := s.ring.lookup(key)
-	return s.kvstore.remoteGet(remoteNode, key)
+func (s *ChordServer) Get(key string) (value string, err error) {
+	remoteNode, err := s.ring.lookup(key)
+	if err != nil {
+		return
+	}
+
+	value, err = s.kvstore.remoteGet(remoteNode, key)
+	return
 }
 
 func (s *ChordServer) Set(key string, value string) error {
-	remoteNode := s.ring.lookup(key)
+	remoteNode, err := s.ring.lookup(key)
+	if err != nil {
+		return err
+	}
+
 	return s.kvstore.remoteSet(remoteNode, key, value)
 }
 
 func (s *ChordServer) Delete(key string) error {
-	remoteNode := s.ring.lookup(key)
+	remoteNode, err := s.ring.lookup(key)
+	if err != nil {
+		return err
+	}
+
 	return s.kvstore.remoteDelete(remoteNode, key)
 }
 
@@ -43,8 +56,8 @@ func New(myAddress string) (server ChordServer) {
 	grpcServer := grpc.NewServer()
 
 	server = ChordServer{
-		listener: &listener,
-		grpcServer: grpcServer,
+		listener:    &listener,
+		grpcServer:  grpcServer,
 		clientCache: make(map[address]*grpc.ClientConn),
 	}
 
