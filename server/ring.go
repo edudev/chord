@@ -112,11 +112,9 @@ func (r *chordRing) calculateFingerTablePosition(k uint) position {
 
 // finds the successor to the given position in the given array of servers
 func (r *chordRing) successorToPositionInServers(servers []ChordServer, p position) ChordServer {
-	// n is our node position (as in the paper)
-	n := r.myNode.pos
 	for _, s := range servers {
-		// find the next node that is larger than q
-		if cmpPosition(p, n) < 0 {
+		// find the next node that is larger than p
+		if cmpPosition(p, s.ring.myNode.pos) < 0 {
 			return s
 		}
 	}
