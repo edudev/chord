@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log"
 	"context"
 	"errors"
 	"sync"
@@ -43,18 +44,19 @@ func (c *chordKV) localDelete(key string) error {
 }
 
 /* Create a new instance of chordKV */
-func newChordKV(server *ChordServer, grpcServer *grpc.Server) chordKV {
-	kvstore := chordKV{
+func newChordKV(server *ChordServer, grpcServer *grpc.Server) *chordKV {
+	kvstore := &chordKV{
 		server: server,
 		table:  make(map[string]string),
 	}
 
-	RegisterChordKVServer(grpcServer, &kvstore)
+	RegisterChordKVServer(grpcServer, kvstore)
 
 	return kvstore
 }
 
 func (c *chordKV) getClient(addr address) (client ChordKVClient) {
+	log.Printf("connecting to kv %v", addr)
 	conn := c.server.getClientConn(addr)
 	client = NewChordKVClient(conn)
 	return

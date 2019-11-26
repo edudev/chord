@@ -64,8 +64,8 @@ func New(myAddress string) (server ChordServer) {
 	ring := newChordRing(&server, address(myAddress), grpcServer)
 	kvstore := newChordKV(&server, grpcServer)
 
-	server.ring = &ring
-	server.kvstore = &kvstore
+	server.ring = ring
+	server.kvstore = kvstore
 
 	return server
 }
@@ -89,6 +89,7 @@ func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
 		return conn
 	}
 
+	log.Printf("connecting to %v", addr)
 	conn, err := grpc.Dial(string(addr), grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)

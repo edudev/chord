@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log"
 	"context"
 	hash "crypto/sha1"
 	"math/big"
@@ -77,18 +78,19 @@ func (r *chordRing) lookup(key string) (addr address, err error) {
 	return
 }
 
-func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Server) chordRing {
-	ring := chordRing{
+func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Server) *chordRing {
+	ring := &chordRing{
 		server: server,
 		myNode: addr2node(myAddress),
 	}
 
-	RegisterChordRingServer(grpcServer, &ring)
+	RegisterChordRingServer(grpcServer, ring)
 
 	return ring
 }
 
 func (r *chordRing) getClient(addr address) (client ChordRingClient) {
+	log.Printf("connecting to ring %v", addr)
 	conn := r.server.getClientConn(addr)
 	client = NewChordRingClient(conn)
 	return
@@ -150,6 +152,7 @@ func (r *chordRing) findSuccessor(keyPos position) (successor *node, e error) {
 	if e != nil {
 		return nil, e
 	}
+	log.Printf("getting successor (final) of %v", predecessor.addr)
 	successorRPC, e := r.getClient(predecessor.addr).GetSuccessor(context.Background(), new(empty.Empty))
 	if e != nil {
 		return nil, e
@@ -171,11 +174,13 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 	successor := r.fingerTable[0]
 	r.lock.RUnlock()
 	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
+		log.Printf("getting ClosestPrecedingFinger for %v from %v", keyPos, n.addr)
 		nRPC, e := r.getClient(n.addr).ClosestPrecedingFinger(context.Background(), &LookupRequest{Position: position2bytes(keyPos)})
 		if e != nil {
 			return nil, e
 		}
 		n = nRPC.node()
+		log.Printf("getting successor for %v", n.addr)
 		successorRPC, e := r.getClient(n.addr).GetSuccessor(context.Background(), new(empty.Empty))
 		if e != nil {
 			return nil, e
@@ -193,10 +198,10 @@ func (rpc *RPCNode) node() node {
 }
 
 func (n node) rpcNode() *RPCNode {
-	ret := new(RPCNode)
-	ret.Address = string(n.addr)
-	ret.Position = position2bytes(n.pos)
-	return ret
+	return &RPCNode{
+		Address: string(n.addr),
+		Position: position2bytes(n.pos),
+	}
 }
 
 // finds the closest predecessor for keyPosition in our local finger table
