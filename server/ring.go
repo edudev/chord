@@ -163,7 +163,11 @@ func (r *chordRing) findSuccessor(keyPos position) (successor *node, e error) {
 
 // checks whether keyPos € (p, successor]
 func isSuccessorResponsibleForPosition(p position, keyPos position, successor position) bool {
-	return cmpPosition(keyPos, p) > 0 && cmpPosition(keyPos, successor) <= 0
+	if cmpPosition(p, successor) <= 0 {
+		return cmpPosition(keyPos, p) > 0 && cmpPosition(keyPos, successor) <= 0
+	}
+
+	return cmpPosition(keyPos, p) > 0 || cmpPosition(keyPos, successor) <= 0
 }
 
 func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error) {
