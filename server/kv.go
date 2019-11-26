@@ -11,7 +11,7 @@ import (
 type chordKV struct {
 	server *ChordServer
 	table  map[string]string
-	lock   *sync.RWMutex
+	lock   sync.RWMutex
 
 	UnimplementedChordKVServer
 }
