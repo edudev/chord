@@ -20,11 +20,11 @@ const (
 
 // a position should be treated as an opague value.
 // however, for the finger table operations, it is useful to treat it as a number.
-type position *big.Int
+type position big.Int
 
 // compares to positions / spaceship operator
 func cmpPosition(a position, b position) int {
-	return ((*big.Int)(a)).Cmp((*big.Int)(b))
+	return ((*big.Int)(&a)).Cmp((*big.Int)(&b))
 }
 
 type node struct {
@@ -45,7 +45,7 @@ type chordRing struct {
 func bytes2position(bytes []byte) (pos position) {
 	// the ordering of bytes shouldn't matter as long as it is consistent.
 	// SetBytes treats the number as unsigned.
-	(*big.Int)(pos).SetBytes(bytes)
+	(*big.Int)(&pos).SetBytes(bytes)
 	return
 }
 
@@ -55,7 +55,7 @@ func key2position(key string) position {
 }
 
 func position2bytes(pos position) []byte {
-	return (*big.Int)(pos).Bytes()
+	return (*big.Int)(&pos).Bytes()
 }
 
 func addr2node(addr address) node {
@@ -104,13 +104,13 @@ func (r *chordRing) calculateFingerTablePosition(k uint) position {
 	var max big.Int
 	max.Lsh(one, M)
 	max.Sub(&max, one)
-	q := new(big.Int)
+	var q big.Int
 	// q = 2^k
 	q.Lsh(one, k)
 	// q = n + q = n + 2^k
-	q.Add(q, n)
+	q.Add(&q, (*big.Int)(&n))
 	// q = q AND max = q mod max = q mod (2^M - 1) = n + 2^k mod (2^M - 1)
-	q.And(q, &max)
+	q.And(&q, &max)
 	return position(q)
 }
 
