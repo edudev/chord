@@ -94,6 +94,7 @@ func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
+	log.Printf("connected to client %v", addr)
 
 	// TODO: close the connection at some point
 	return conn

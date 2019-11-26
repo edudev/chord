@@ -148,6 +148,7 @@ func (r *chordRing) fillFingerTable(servers []ChordServer) {
 }
 
 func (r *chordRing) findSuccessor(keyPos position) (successor *node, e error) {
+	log.Printf("getting predecessor of %v", keyPos)
 	predecessor, e := r.findPredecessor(keyPos)
 	if e != nil {
 		return nil, e

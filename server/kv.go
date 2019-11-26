@@ -103,6 +103,7 @@ func (c *chordKV) Delete(ctx context.Context, in *DeleteRequest) (reply *DeleteR
 }
 
 func (c *chordKV) remoteGet(remoteNode address, key string) (value string, err error) {
+	log.Printf("doing a remote get on %v for ", remoteNode, key)
 	keyPos := key2position(key)
 	getRequest := &GetRequest{Key: key, Position: position2bytes(keyPos)}
 	getReply, err := c.getClient(remoteNode).Get(context.Background(), getRequest)
