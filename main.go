@@ -28,6 +28,7 @@ func populateNodes(count uint) (servers []kvserver.ChordServer) {
 		servers[id] = createNode(id + 1)
 	}
 
+	kvserver.SortServersByNodePosition(servers)
 	for _, server := range servers {
 		server.FillFingerTable(servers)
 	}
@@ -35,12 +36,22 @@ func populateNodes(count uint) (servers []kvserver.ChordServer) {
 	return
 }
 
-func listenAndServe(wg *sync.WaitGroup, f func() error) {
+type serverType interface {
+	ListenAndServe() error
+}
+
+func listenAndServe(wg *sync.WaitGroup, i int, server serverType) {
 	wg.Add(1)
 	go func() {
-		f()
+		log.Printf("do listen and serve %v %v", i, server)
+		server.ListenAndServe()
+		log.Printf("done listen and serve")
 		wg.Done()
 	}()
+}
+
+func listenAndServeChord(wg *sync.WaitGroup, servers []kvserver.ChordServer, i int) {
+	listenAndServe(wg, i, &servers[i])
 }
 
 func main() {
@@ -55,10 +66,10 @@ func main() {
 	memcachedServer := memcached.NewServer("127.0.0.1:11211", &holder)
 
 	var wg sync.WaitGroup
-	listenAndServe(&wg, memcachedServer.ListenAndServe)
+	listenAndServe(&wg, -1, memcachedServer)
 
-	for _, server := range servers {
-		listenAndServe(&wg, server.ListenAndServe)
+	for i, _ := range servers {
+		listenAndServeChord(&wg, servers, i)
 	}
 
 	wg.Wait()
