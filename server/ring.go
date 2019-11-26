@@ -5,6 +5,7 @@ import (
 	hash "crypto/sha1"
 	"math/big"
 	"sort"
+	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
@@ -36,6 +37,7 @@ type chordRing struct {
 
 	myNode      node
 	fingerTable [M]node
+	lock        *sync.RWMutex
 
 	UnimplementedChordRingServer
 }
@@ -74,6 +76,7 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 	ring := chordRing{
 		server: server,
 		myNode: addr2node(myAddress),
+		lock:   new(sync.RWMutex),
 	}
 
 	RegisterChordRingServer(grpcServer, &ring)
@@ -131,6 +134,8 @@ func (a sortByPosition) Less(i, j int) bool {
 }
 
 func (r *chordRing) fillFingerTable(servers []ChordServer) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	sort.Sort(sortByPosition(servers))
 	for k := uint(0); k < M; k++ {
 		q := r.calculateFingerTablePosition(k)
@@ -160,7 +165,9 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 	// iteratively ask nodes (rpc) until we get a node for which keyPos
 	// is between (node, nodeSuccessor]
 	n := r.myNode
+	r.lock.RLock()
 	successor := r.fingerTable[0]
+	r.lock.RUnlock()
 	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
 		nRPC, e := r.getClient(n.addr).ClosestPrecedingFinger(context.Background(), &LookupRequest{Position: position2bytes(keyPos)})
 		if e != nil {
@@ -192,6 +199,8 @@ func (n node) rpcNode() *RPCNode {
 
 // finds the closest predecessor for keyPosition in our local finger table
 func (r *chordRing) fingerTableClosestPredecessor(keyPosition position) node {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	for i := uint(0); i < M-1; i++ {
 		if isSuccessorResponsibleForPosition(r.fingerTable[i].pos, keyPosition, r.fingerTable[i+1].pos) {
 			return r.fingerTable[i]
@@ -201,6 +210,8 @@ func (r *chordRing) fingerTableClosestPredecessor(keyPosition position) node {
 }
 
 func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	return r.fingerTable[0].rpcNode(), nil
 }
 
