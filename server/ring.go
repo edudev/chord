@@ -37,7 +37,7 @@ type chordRing struct {
 
 	myNode      node
 	fingerTable [M]node
-	lock        *sync.RWMutex
+	lock        sync.RWMutex
 
 	UnimplementedChordRingServer
 }
@@ -76,7 +76,6 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 	ring := chordRing{
 		server: server,
 		myNode: addr2node(myAddress),
-		lock:   new(sync.RWMutex),
 	}
 
 	RegisterChordRingServer(grpcServer, &ring)
