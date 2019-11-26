@@ -28,6 +28,7 @@ func populateNodes(count uint) (servers []kvserver.ChordServer) {
 		servers[id] = createNode(id + 1)
 	}
 
+	kvserver.SortServersByNodePosition(servers)
 	for _, server := range servers {
 		server.FillFingerTable(servers)
 	}

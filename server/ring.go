@@ -137,10 +137,13 @@ func (a sortByPosition) Less(i, j int) bool {
 	return cmpPosition(a[i].ring.myNode.pos, a[j].ring.myNode.pos) < 0
 }
 
+func SortServersByNodePosition(servers []ChordServer) {
+	sort.Sort(sortByPosition(servers))
+}
+
 func (r *chordRing) fillFingerTable(servers []ChordServer) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	sort.Sort(sortByPosition(servers))
 	for k := uint(0); k < M; k++ {
 		q := r.calculateFingerTablePosition(k)
 		r.fingerTable[k] = r.successorToPositionInServers(servers, q).ring.myNode
