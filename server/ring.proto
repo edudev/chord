@@ -8,6 +8,9 @@ package server;
 service ChordRing {
   rpc GetSuccessor (google.protobuf.Empty) returns (RPCNode) {}
   rpc ClosestPrecedingFinger (LookupRequest) returns (RPCNode) {}
+  rpc FindSuccessor (LookupRequest) returns (RPCNode) {}
+  rpc GetPredecessor (google.protobuf.Empty) returns (RPCNode) {}
+  rpc Notify(RPCNode) returns (google.protobuf.Empty) {}
 }
 
 message LookupRequest {

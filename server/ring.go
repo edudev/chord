@@ -1,9 +1,9 @@
 package server
 
 import (
-	"log"
 	"context"
 	hash "crypto/sha1"
+	"log"
 	"math/big"
 	"sort"
 	"sync"
@@ -38,7 +38,10 @@ type chordRing struct {
 
 	myNode      node
 	fingerTable [M]node
-	lock        sync.RWMutex
+	// TODO `predecessor` should really be an optional instead of a pointer
+	predecessor        *node
+	nextFingerFixIndex uint
+	lock               sync.RWMutex
 
 	UnimplementedChordRingServer
 }
@@ -80,8 +83,9 @@ func (r *chordRing) lookup(key string) (addr address, err error) {
 
 func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Server) *chordRing {
 	ring := &chordRing{
-		server: server,
-		myNode: addr2node(myAddress),
+		server:             server,
+		myNode:             addr2node(myAddress),
+		nextFingerFixIndex: M - 1,
 	}
 
 	RegisterChordRingServer(grpcServer, ring)
@@ -89,11 +93,122 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 	return ring
 }
 
+// TODO need to set predecessor to nil if it becomes unavailable
+// there is adifference here between the two versions of the paper
+// the version in the git repo contains an extra thing to set the predecessor to nil if it becomes unavailable
+// generally it might make sense to have a method on chordRing that can be called if the rest of the code notices
+// that a node has become available. chordRing can then take the necessary steps depending on the relationship between
+// itself and the dead node (is predecessor, part of fingertable, etc)
+
+// joins the given chord ring.
+// otherNodeAddr can be nil to indicate there is node to join to (this is the first node)
+func (r *chordRing) join(otherNodeAddr *address) (e error) {
+	if otherNodeAddr != nil {
+		return r.initFingerTable(*otherNodeAddr)
+	}
+	// TODO the following is not described in the paper
+	// it is described in the pseudocode for the 'easier' case (figure 6) though.
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	for i := uint(0); i < M; i++ {
+		// TODO is it correct to reference ourselves in the finger table? won't this create loops?
+		r.fingerTable[i] = r.myNode
+		r.predecessor = &r.myNode
+	}
+	return nil
+}
+
+func (r *chordRing) initFingerTable(nodeToJoin address) error {
+	successorRPC, e := r.getClient(nodeToJoin).GetSuccessor(context.Background(), new(empty.Empty))
+	if e != nil {
+		return e
+	}
+	successor := successorRPC.node()
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	// TODO it is not entirely clear whether the following is legit.
+	// I think it should be, but it is not in the pseudocode.
+	// otherwise the table will never get initialiazed though and then we would have to handle uninitialized values everywhere we handle this table.
+	// need to figure out what to do here.
+	// the solution might come once we handle failure properly.
+	for i := uint(0); i < M; i++ {
+		r.fingerTable[i] = successor
+	}
+	return nil
+}
+
+// checks whether element € (left, right), respecting wrapping
+func isPosInRangExclusive(left position, element position, right position) bool {
+	if cmpPosition(left, right) <= 0 {
+		return cmpPosition(element, left) > 0 && cmpPosition(element, right) < 0
+	}
+
+	return cmpPosition(element, left) > 0 || cmpPosition(element, right) < 0
+}
+
+// the stabilize function as defined in the paper
+// TODO should be called 'periodically'.
+// the 'period' is unclear.
+// TODO will this be called from the outside or should it call itself?
+func (r *chordRing) stabilize() error {
+	r.lock.RLock()
+	successor := r.fingerTable[0]
+	r.lock.RUnlock()
+	xRPC, e := r.getClient(successor.addr).GetPredecessor(context.Background(), new(empty.Empty))
+	if e != nil {
+		return e
+	}
+	x := xRPC.node()
+	if x.addr == "" { // successor has no predecessor?
+		return nil
+	}
+	if isPosInRangExclusive(r.myNode.pos, x.pos, successor.pos) {
+		r.lock.Lock()
+		r.fingerTable[0] = x
+		r.lock.Unlock()
+		successor = x
+		// TODO shall we also replace other entries occupied by the same node in the finger table?
+	}
+	// TODO error is ignored for now.
+	// I am not sure what we shall do if this errors.
+	// If this errors, most likely the successor is dead.
+	// but what to do then? we're f**k'd.
+	// maybe this will get resolved once we handle failure though
+	_, e = r.getClient(successor.addr).Notify(context.Background(), r.myNode.rpcNode())
+	return nil
+}
+
 func (r *chordRing) getClient(addr address) (client ChordRingClient) {
 	log.Printf("connecting to ring %v", addr)
 	conn := r.server.getClientConn(addr)
 	client = NewChordRingClient(conn)
 	return
+}
+
+// sets the nextFingerFixIndex to the next value and returns the old one
+func (r *chordRing) setFixIndexToNextIndex() (k uint) {
+	k = r.nextFingerFixIndex
+	if r.nextFingerFixIndex == 0 {
+		r.nextFingerFixIndex = M - 1
+	} else {
+		r.nextFingerFixIndex--
+	}
+	return
+}
+
+// the fix finger function according to the paper
+// TODO should be called periodically. see comments on `stabilize`
+func (r *chordRing) fixFingers() error {
+	k := r.setFixIndexToNextIndex()
+	n := r.calculateFingerTablePosition(k)
+	successor, e := r.findSuccessor(n)
+	if e != nil {
+		return e
+	}
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.fingerTable[k] = *successor
+	return nil
 }
 
 // calculates n + 2^k mod (2^M - 1)
@@ -207,7 +322,7 @@ func (rpc *RPCNode) node() node {
 
 func (n node) rpcNode() *RPCNode {
 	return &RPCNode{
-		Address: string(n.addr),
+		Address:  string(n.addr),
 		Position: position2bytes(n.pos),
 	}
 }
@@ -233,4 +348,28 @@ func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode
 func (r *chordRing) ClosestPrecedingFinger(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
 	keyPosition := bytes2position(in.GetPosition())
 	return r.fingerTableClosestPredecessor(keyPosition).rpcNode(), nil
+}
+
+func (r *chordRing) FindSuccessor(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
+	position := bytes2position(in.GetPosition())
+	successor, e := r.findSuccessor(position)
+	if e != nil {
+		return nil, e
+	}
+	return successor.rpcNode(), nil
+}
+
+func (r *chordRing) GetPredecessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
+	if r.predecessor == nil {
+		return &RPCNode{Address: "", Position: []byte{}}, nil
+	}
+	return r.predecessor.rpcNode(), nil
+}
+
+func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, error) {
+	nPrime := in.node()
+	if r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
+		r.predecessor = &nPrime
+	}
+	return new(empty.Empty), nil
 }
