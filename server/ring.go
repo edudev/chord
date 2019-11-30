@@ -86,6 +86,7 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 		server:             server,
 		myNode:             addr2node(myAddress),
 		nextFingerFixIndex: M - 1,
+		predecessor:        nil,
 	}
 
 	RegisterChordRingServer(grpcServer, ring)
@@ -134,6 +135,7 @@ func (r *chordRing) initFingerTable(nodeToJoin address) error {
 	for i := uint(0); i < M; i++ {
 		r.fingerTable[i] = successor
 	}
+	r.predecessor = nil
 	return nil
 }
 
