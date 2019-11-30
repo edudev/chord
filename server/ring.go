@@ -120,7 +120,7 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 }
 
 func (r *chordRing) initFingerTable(nodeToJoin address) error {
-	successorRPC, e := r.getClient(nodeToJoin).GetSuccessor(context.Background(), new(empty.Empty))
+	successorRPC, e := r.getClient(nodeToJoin).FindSuccessor(context.Background(), &LookupRequest{Position: position2bytes(r.myNode.pos)})
 	if e != nil {
 		return e
 	}
