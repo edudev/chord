@@ -105,8 +105,10 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 // otherNodeAddr can be nil to indicate there is node to join to (this is the first node)
 func (r *chordRing) join(otherNodeAddr *address) (e error) {
 	if otherNodeAddr != nil {
+		// there is an existing ring to join to
 		return r.initFingerTable(*otherNodeAddr)
 	}
+	// no ring to join to, we are the 'first' node
 	// TODO the following is not described in the paper
 	// it is described in the pseudocode for the 'easier' case (figure 6) though.
 	r.lock.Lock()
