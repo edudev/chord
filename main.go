@@ -103,5 +103,7 @@ func main() {
 		listenAndServe(&wg, int(id), &newServer)
 	}
 
+	fmt.Println(servers)
+
 	wg.Wait()
 }
