@@ -16,7 +16,7 @@ const (
 	chordPort uint16 = 21211
 )
 
-func isStable() bool {
+func isStable(reply chan bool) {
 	// Make RPC calls to each node to fetch
 	// their last finger table update
 
@@ -36,7 +36,7 @@ func isStable() bool {
 	// return false
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	return true
+	reply <- true
 }
 
 func createNode(id uint) (server kvserver.ChordServer) {
@@ -46,21 +46,17 @@ func createNode(id uint) (server kvserver.ChordServer) {
 }
 
 func addNodesToRing(prevServersList []kvserver.ChordServer, id uint) (newServer kvserver.ChordServer, newServersList []kvserver.ChordServer) {
-	// Little shitty piece of code to loop
-	// until difference become more than 10
-	// seconds. Until then the joining node
-	// waits.
-	for {
-		if isStable() == true {
-			newServer = createNode(id + 1)
-			newServersList = append(prevServersList, newServer)
-			kvserver.SortServersByNodePosition(newServersList)
-			newServer.FillFingerTable(newServersList)
-			break
-		} else {
-			continue
-		}
-	}
+	// Using blocking channel to wait until
+	// isStable function reply with true
+	reply := make(chan bool)
+	go isStable(reply)
+	<-reply
+
+	newServer = createNode(id + 1)
+	newServersList = append(prevServersList, newServer)
+	kvserver.SortServersByNodePosition(newServersList)
+	newServer.FillFingerTable(newServersList)
+
 	return
 }
 
