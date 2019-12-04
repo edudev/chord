@@ -231,10 +231,11 @@ func (r *chordRing) stabilize() error {
 	if e != nil {
 		return e
 	}
-	x := xRPC.node()
-	if x.addr == "" { // successor has no predecessor?
+	if !xRPC.Valid { // successor has no predecessor?
 		return nil
 	}
+
+	x := xRPC.Node.node()
 	if isPosInRangExclusive(r.myNode.pos, x.pos, successor.pos) {
 		r.lock.Lock()
 		r.fingerTable[0] = x
@@ -435,16 +436,19 @@ func (r *chordRing) FindSuccessor(ctx context.Context, in *LookupRequest) (*RPCN
 	return successor.rpcNode(), nil
 }
 
-func (r *chordRing) GetPredecessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
+func (r *chordRing) GetPredecessor(ctx context.Context, in *empty.Empty) (*PredecessorReply, error) {
 	r.lock.RLock()
-	defer r.lock.RUnlock()
+	predecessor := r.predecessor
+	r.lock.RUnlock()
 
-	if r.predecessor == nil {
-		// TODO: add a boolean field for whether the rpc node is set
-		return &RPCNode{Address: "", Position: []byte{}}, nil
+	if predecessor == nil {
+		return &PredecessorReply{Valid: false}, nil
 	}
 
-	return r.predecessor.rpcNode(), nil
+	return &PredecessorReply{
+		Valid: true,
+		Node: predecessor.rpcNode(),
+	}, nil
 }
 
 func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, error) {
