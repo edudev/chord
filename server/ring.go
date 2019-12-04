@@ -17,7 +17,18 @@ const (
 	// which is 2^M in size (M specifies the amount of bits in an identifier).
 	// It is chosen to be the amount of bits we receive from the hashing function.
 	M uint = hash.Size * 8
+	// R is supposed to be log_2(N) where N is the number of nodes.
+	// however, we don't know the number of nodes...
+	R uint = 5
 )
+
+// TODO lock on predecessor
+// TODO fill successors during join
+// TODO create RPC wrapper methods that do the type conversions
+// TODO keep immediate successor only in fingerTable not also in successors
+// TODO use a list instead of array for successors
+// TODO let stabilize goroutine receive explicit fix notifications
+// TODO check mutex recursive
 
 // a position should be treated as an opague value.
 // however, for the finger table operations, it is useful to treat it as a number.
@@ -41,7 +52,11 @@ type chordRing struct {
 	// TODO `predecessor` should really be an optional instead of a pointer
 	predecessor        *node
 	nextFingerFixIndex uint
-	lock               sync.RWMutex
+	// successors keeps track of R successors to this node
+	successors [R](*node)
+	// TODO rename to fingerTableLock
+	lock           sync.RWMutex
+	successorsLock sync.RWMutex
 
 	UnimplementedChordRingServer
 }
@@ -94,13 +109,6 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 	return ring
 }
 
-// TODO need to set predecessor to nil if it becomes unavailable
-// there is adifference here between the two versions of the paper
-// the version in the git repo contains an extra thing to set the predecessor to nil if it becomes unavailable
-// generally it might make sense to have a method on chordRing that can be called if the rest of the code notices
-// that a node has become available. chordRing can then take the necessary steps depending on the relationship between
-// itself and the dead node (is predecessor, part of fingertable, etc)
-
 // joins the given chord ring.
 // otherNodeAddr can be nil to indicate there is node to join to (this is the first node)
 func (r *chordRing) join(otherNodeAddr *address) (e error) {
@@ -109,35 +117,80 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 		return r.initFingerTable(*otherNodeAddr)
 	}
 	// no ring to join to, we are the 'first' node
-	// TODO the following is not described in the paper
-	// it is described in the pseudocode for the 'easier' case (figure 6) though.
 	r.lock.Lock()
 	defer r.lock.Unlock()
+	r.predecessor = &r.myNode
 	for i := uint(0); i < M; i++ {
-		// TODO is it correct to reference ourselves in the finger table? won't this create loops?
 		r.fingerTable[i] = r.myNode
-		r.predecessor = &r.myNode
 	}
 	return nil
 }
 
+// to be called if we realize the node at the given address is gone
+func (r *chordRing) nodeDied(addr address) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.successorsLock.Lock()
+	defer r.successorsLock.Unlock()
+	if r.predecessor != nil && addr == r.predecessor.addr {
+		// TODO may want to trigger a predecessor update immediately
+		r.predecessor = nil
+	}
+	// update successors
+	for i, successor := range r.successors {
+		if successor.addr == addr {
+			// TODO hint to fix_successors
+			r.successors[i] = nil
+		}
+	}
+
+	// fix fingerTable, excluding successor
+	for i := M - 1; i > 0; i-- {
+		if r.fingerTable[i].addr == addr {
+			var s node
+			if i == M-1 {
+				s = r.myNode
+			} else {
+				s = r.fingerTable[i+1]
+			}
+			r.fingerTable[i] = s
+			// TODO hint stabilize
+		}
+	}
+
+	// fix successor
+	if r.fingerTable[0].addr == addr {
+		// find the next successor
+		var newSuccessor *node
+		newSuccessor = nil
+		for _, successor := range r.successors {
+			if successor != nil {
+				newSuccessor = successor
+				break
+			}
+		}
+		if newSuccessor == nil {
+			// find the next sucessor finger table
+			// since the finger table is correct as per the above loop,
+			// we can just to the following
+			newSuccessor = &r.fingerTable[1]
+		}
+		r.fingerTable[0] = *newSuccessor
+	}
+}
+
 func (r *chordRing) initFingerTable(nodeToJoin address) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.predecessor = nil
 	successorRPC, e := r.getClient(nodeToJoin).FindSuccessor(context.Background(), &LookupRequest{Position: position2bytes(r.myNode.pos)})
 	if e != nil {
 		return e
 	}
 	successor := successorRPC.node()
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	// TODO it is not entirely clear whether the following is legit.
-	// I think it should be, but it is not in the pseudocode.
-	// otherwise the table will never get initialiazed though and then we would have to handle uninitialized values everywhere we handle this table.
-	// need to figure out what to do here.
-	// the solution might come once we handle failure properly.
 	for i := uint(0); i < M; i++ {
 		r.fingerTable[i] = successor
 	}
-	r.predecessor = nil
 	return nil
 }
 
@@ -151,9 +204,7 @@ func isPosInRangExclusive(left position, element position, right position) bool 
 }
 
 // the stabilize function as defined in the paper
-// TODO should be called 'periodically'.
-// the 'period' is unclear.
-// TODO will this be called from the outside or should it call itself?
+// TODO call periodically with period 150ms in a go routine, kill using channel
 func (r *chordRing) stabilize() error {
 	r.lock.RLock()
 	successor := r.fingerTable[0]
@@ -169,16 +220,19 @@ func (r *chordRing) stabilize() error {
 	if isPosInRangExclusive(r.myNode.pos, x.pos, successor.pos) {
 		r.lock.Lock()
 		r.fingerTable[0] = x
+		// TODO add to successor list? -> push_front
 		r.lock.Unlock()
 		successor = x
-		// TODO shall we also replace other entries occupied by the same node in the finger table?
+		// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
 	}
-	// TODO error is ignored for now.
-	// I am not sure what we shall do if this errors.
-	// If this errors, most likely the successor is dead.
-	// but what to do then? we're f**k'd.
-	// maybe this will get resolved once we handle failure though
 	_, e = r.getClient(successor.addr).Notify(context.Background(), r.myNode.rpcNode())
+	return nil
+}
+
+// fixes the successor list if need be
+// TODO should be called in stabilize
+func (r *chordRing) fixSuccessors() error {
+	// TODO implement
 	return nil
 }
 
@@ -269,6 +323,7 @@ func (r *chordRing) fillFingerTable(servers []ChordServer) {
 	}
 }
 
+// TODO don't return a pointer
 func (r *chordRing) findSuccessor(keyPos position) (successor *node, e error) {
 	log.Printf("getting predecessor of %v", keyPos)
 	predecessor, e := r.findPredecessor(keyPos)
