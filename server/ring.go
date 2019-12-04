@@ -4,6 +4,7 @@ import (
 	"context"
 	hash "crypto/sha1"
 	"log"
+	"time"
 	"math/big"
 	"sort"
 	"sync"
@@ -13,6 +14,9 @@ import (
 )
 
 const (
+	TICK_STABILISE = 100 * time.Millisecond
+	TICK_FIX_FINGERS = 500 * time.Millisecond
+
 	// M as it is used in the paper. M specifies the size of the identifier ring,
 	// which is 2^M in size (M specifies the amount of bits in an identifier).
 	// It is chosen to be the amount of bits we receive from the hashing function.
@@ -56,6 +60,10 @@ type chordRing struct {
 	// TODO rename to fingerTableLock
 	lock           sync.RWMutex
 	successorsLock sync.RWMutex
+
+	stopped chan bool
+	stabiliseQueue chan bool
+	fixFingersQueue chan bool
 
 	UnimplementedChordRingServer
 }
@@ -101,6 +109,10 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 		myNode:             addr2node(myAddress),
 		nextFingerFixIndex: M - 1,
 		predecessor:        nil,
+
+		stopped: make(chan bool),
+		stabiliseQueue: make(chan bool),
+		fixFingersQueue: make(chan bool),
 	}
 
 	RegisterChordRingServer(grpcServer, ring)
@@ -446,4 +458,56 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 		r.predecessor = &nPrime
 	}
 	return new(empty.Empty), nil
+}
+
+func (r *chordRing) ListenAndServe() error {
+	go r.periodicActionWorker()
+	go r.periodicTicker()
+
+	return nil
+}
+
+func (r *chordRing) Stop() {
+	close(r.stopped)
+}
+
+func (r *chordRing) askToStabilise() {
+	r.stabiliseQueue <- true
+}
+
+func (r *chordRing) askToFixFingers() {
+	r.fixFingersQueue <- true
+}
+
+func (r *chordRing) periodicActionWorker() {
+	for {
+		select {
+			case <- r.stopped:
+				return
+			case <- r.stabiliseQueue:
+				if err := r.stabilize(); err != nil {
+					log.Printf("Stabilise failed %v", err);
+				}
+			case <- r.fixFingersQueue:
+				if err := r.fixFingers(); err != nil {
+					log.Printf("Stabilise failed %v", err);
+				}
+		}
+	}
+}
+
+func (r *chordRing) periodicTicker() {
+	stabiliseTicker := time.NewTicker(TICK_STABILISE)
+	fixFingersTicker := time.NewTicker(TICK_FIX_FINGERS)
+
+	for {
+		select {
+			case <- r.stopped:
+				return
+			case <- stabiliseTicker.C:
+				r.askToStabilise()
+			case <- fixFingersTicker.C:
+				r.askToFixFingers()
+		}
+	}
 }

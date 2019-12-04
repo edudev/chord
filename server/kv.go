@@ -146,3 +146,6 @@ func (c *chordKV) remoteDelete(remoteNode address, key string) (err error) {
 
 	return
 }
+
+func (c *chordKV) Stop() {
+}
