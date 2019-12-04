@@ -22,8 +22,7 @@ const (
 	R uint = 5
 )
 
-// TODO lock on predecessor
-// TODO fill successors during join
+// TODO do fine grained locking (on predecessor, finger table, successor list)
 // TODO create RPC wrapper methods that do the type conversions
 // TODO keep immediate successor only in fingerTable not also in successors
 // TODO use a list instead of array for successors
@@ -119,6 +118,7 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 	// no ring to join to, we are the 'first' node
 	r.lock.Lock()
 	defer r.lock.Unlock()
+
 	r.predecessor = &r.myNode
 	for i := uint(0); i < M; i++ {
 		r.fingerTable[i] = r.myNode
@@ -132,6 +132,7 @@ func (r *chordRing) nodeDied(addr address) {
 	defer r.lock.Unlock()
 	r.successorsLock.Lock()
 	defer r.successorsLock.Unlock()
+
 	if r.predecessor != nil && addr == r.predecessor.addr {
 		// TODO may want to trigger a predecessor update immediately
 		r.predecessor = nil
@@ -180,17 +181,22 @@ func (r *chordRing) nodeDied(addr address) {
 }
 
 func (r *chordRing) initFingerTable(nodeToJoin address) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	r.predecessor = nil
 	successorRPC, e := r.getClient(nodeToJoin).FindSuccessor(context.Background(), &LookupRequest{Position: position2bytes(r.myNode.pos)})
 	if e != nil {
 		return e
 	}
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.predecessor = nil
 	successor := successorRPC.node()
+
 	for i := uint(0); i < M; i++ {
 		r.fingerTable[i] = successor
 	}
+
+	// TODO fill successors during join
 	return nil
 }
 
@@ -209,6 +215,7 @@ func (r *chordRing) stabilize() error {
 	r.lock.RLock()
 	successor := r.fingerTable[0]
 	r.lock.RUnlock()
+
 	xRPC, e := r.getClient(successor.addr).GetPredecessor(context.Background(), new(empty.Empty))
 	if e != nil {
 		return e
@@ -419,13 +426,21 @@ func (r *chordRing) FindSuccessor(ctx context.Context, in *LookupRequest) (*RPCN
 }
 
 func (r *chordRing) GetPredecessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
 	if r.predecessor == nil {
+		// TODO: add a boolean field for whether the rpc node is set
 		return &RPCNode{Address: "", Position: []byte{}}, nil
 	}
+
 	return r.predecessor.rpcNode(), nil
 }
 
 func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	nPrime := in.node()
 	if r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
 		r.predecessor = &nPrime
