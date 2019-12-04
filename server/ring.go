@@ -222,7 +222,6 @@ func isPosInRangExclusive(left position, element position, right position) bool 
 }
 
 // the stabilize function as defined in the paper
-// TODO call periodically with period 150ms in a go routine, kill using channel
 func (r *chordRing) stabilize() error {
 	r.lock.RLock()
 	successor := r.fingerTable[0]
@@ -274,7 +273,6 @@ func (r *chordRing) setFixIndexToNextIndex() (k uint) {
 }
 
 // the fix finger function according to the paper
-// TODO should be called periodically. see comments on `stabilize`
 func (r *chordRing) fixFingers() error {
 	k := r.setFixIndexToNextIndex()
 	n := r.calculateFingerTablePosition(k)
@@ -284,7 +282,7 @@ func (r *chordRing) fixFingers() error {
 	}
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	r.fingerTable[k] = *successor
+	r.fingerTable[k] = successor
 	return nil
 }
 
@@ -343,19 +341,19 @@ func (r *chordRing) fillFingerTable(servers []ChordServer) {
 }
 
 // TODO don't return a pointer
-func (r *chordRing) findSuccessor(keyPos position) (successor *node, e error) {
+func (r *chordRing) findSuccessor(keyPos position) (successor node, err error) {
 	log.Printf("getting predecessor of %v", keyPos)
-	predecessor, e := r.findPredecessor(keyPos)
-	if e != nil {
-		return nil, e
+	predecessor, err := r.findPredecessor(keyPos)
+	if err != nil {
+		return
 	}
 	log.Printf("getting successor (final) of %v", predecessor.addr)
-	successorRPC, e := r.getClient(predecessor.addr).GetSuccessor(context.Background(), new(empty.Empty))
-	if e != nil {
-		return nil, e
+	successorRPC, err := r.getClient(predecessor.addr).GetSuccessor(context.Background(), new(empty.Empty))
+	if err != nil {
+		return
 	}
-	n := successorRPC.node()
-	return &n, nil
+	successor = successorRPC.node()
+	return
 }
 
 // checks whether keyPos € (p, successor]
@@ -490,7 +488,7 @@ func (r *chordRing) periodicActionWorker() {
 				}
 			case <- r.fixFingersQueue:
 				if err := r.fixFingers(); err != nil {
-					log.Printf("Stabilise failed %v", err);
+					log.Printf("Fix fingers failed %v", err);
 				}
 		}
 	}
