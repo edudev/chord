@@ -1,9 +1,9 @@
 package server
 
 import (
-	"log"
 	"context"
 	"errors"
+	"log"
 	"sync"
 
 	"google.golang.org/grpc"

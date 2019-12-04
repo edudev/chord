@@ -4,17 +4,17 @@ import (
 	"context"
 	hash "crypto/sha1"
 	"log"
-	"time"
 	"math/big"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
 )
 
 const (
-	TICK_STABILISE = 100 * time.Millisecond
+	TICK_STABILISE   = 100 * time.Millisecond
 	TICK_FIX_FINGERS = 500 * time.Millisecond
 
 	// M as it is used in the paper. M specifies the size of the identifier ring,
@@ -58,11 +58,11 @@ type chordRing struct {
 	// successors keeps track of R successors to this node
 	successors [R](*node)
 	// TODO rename to fingerTableLock
-	lock           sync.RWMutex
-	successorsLock sync.RWMutex
+	fingerTableLock sync.RWMutex
+	successorsLock  sync.RWMutex
 
-	stopped chan bool
-	stabiliseQueue chan bool
+	stopped         chan bool
+	stabiliseQueue  chan bool
 	fixFingersQueue chan bool
 
 	UnimplementedChordRingServer
@@ -110,8 +110,8 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 		nextFingerFixIndex: M - 1,
 		predecessor:        nil,
 
-		stopped: make(chan bool),
-		stabiliseQueue: make(chan bool),
+		stopped:         make(chan bool),
+		stabiliseQueue:  make(chan bool),
 		fixFingersQueue: make(chan bool),
 	}
 
@@ -128,13 +128,17 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 		return r.initFingerTable(*otherNodeAddr)
 	}
 	// no ring to join to, we are the 'first' node
-	r.lock.Lock()
-	defer r.lock.Unlock()
 
+	r.predecessorLock.Lock()
 	r.predecessor = &r.myNode
+	r.predecessorLock.Unlock()
+
+	r.fingerTableLock.Lock()
 	for i := uint(0); i < M; i++ {
 		r.fingerTable[i] = r.myNode
 	}
+	r.fingerTableLock.Unlock()
+
 	return nil
 }
 
@@ -198,15 +202,17 @@ func (r *chordRing) initFingerTable(nodeToJoin address) error {
 		return e
 	}
 
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.predecessor = nil
 	successor := successorRPC.node()
 
+	r.predecessorLock.Lock()
+	r.predecessor = nil
+	r.predecessorLock.Unlock()
+
+	r.fingerTableLock.Lock()
 	for i := uint(0); i < M; i++ {
 		r.fingerTable[i] = successor
 	}
+	r.fingerTableLock.Unlock()
 
 	// TODO fill successors during join
 	return nil
@@ -223,9 +229,9 @@ func isPosInRangExclusive(left position, element position, right position) bool 
 
 // the stabilize function as defined in the paper
 func (r *chordRing) stabilize() error {
-	r.lock.RLock()
+	r.fingerTableLock.RLock()
 	successor := r.fingerTable[0]
-	r.lock.RUnlock()
+	r.fingerTableLock.RUnlock()
 
 	xRPC, e := r.getClient(successor.addr).GetPredecessor(context.Background(), new(empty.Empty))
 	if e != nil {
@@ -237,10 +243,11 @@ func (r *chordRing) stabilize() error {
 
 	x := xRPC.Node.node()
 	if isPosInRangExclusive(r.myNode.pos, x.pos, successor.pos) {
-		r.lock.Lock()
+		r.fingerTableLock.Lock()
 		r.fingerTable[0] = x
+		r.fingerTableLock.Unlock()
+
 		// TODO add to successor list? -> push_front
-		r.lock.Unlock()
 		successor = x
 		// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
 	}
@@ -281,9 +288,11 @@ func (r *chordRing) fixFingers() error {
 	if e != nil {
 		return e
 	}
-	r.lock.Lock()
-	defer r.lock.Unlock()
+
+	r.fingerTableLock.Lock()
 	r.fingerTable[k] = successor
+	r.fingerTableLock.Unlock()
+
 	return nil
 }
 
@@ -333,12 +342,14 @@ func SortServersByNodePosition(servers []ChordServer) {
 }
 
 func (r *chordRing) fillFingerTable(servers []ChordServer) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.fingerTableLock.Lock()
+
 	for k := uint(0); k < M; k++ {
 		q := r.calculateFingerTablePosition(k)
 		r.fingerTable[k] = r.successorToPositionInServers(servers, q).ring.myNode
 	}
+
+	r.fingerTableLock.Unlock()
 }
 
 // TODO don't return a pointer
@@ -370,9 +381,10 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 	// iteratively ask nodes (rpc) until we get a node for which keyPos
 	// is between (node, nodeSuccessor]
 	n := r.myNode
-	r.lock.RLock()
+	r.fingerTableLock.RLock()
 	successor := r.fingerTable[0]
-	r.lock.RUnlock()
+	r.fingerTableLock.RUnlock()
+
 	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
 		log.Printf("getting ClosestPrecedingFinger for %v from %v", keyPos, n.addr)
 		nRPC, e := r.getClient(n.addr).ClosestPrecedingFinger(context.Background(), &LookupRequest{Position: position2bytes(keyPos)})
@@ -406,8 +418,9 @@ func (n node) rpcNode() *RPCNode {
 
 // finds the closest predecessor for keyPosition in our local finger table
 func (r *chordRing) fingerTableClosestPredecessor(keyPosition position) node {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
+	r.fingerTableLock.RLock()
+	defer r.fingerTableLock.RUnlock()
+
 	for i := uint(0); i < M-1; i++ {
 		if isSuccessorResponsibleForPosition(r.fingerTable[i].pos, keyPosition, r.fingerTable[i+1].pos) {
 			return r.fingerTable[i]
@@ -417,9 +430,11 @@ func (r *chordRing) fingerTableClosestPredecessor(keyPosition position) node {
 }
 
 func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-	return r.fingerTable[0].rpcNode(), nil
+	r.fingerTableLock.RLock()
+	successor := r.fingerTable[0]
+	r.fingerTableLock.RUnlock()
+
+	return successor.rpcNode(), nil
 }
 
 func (r *chordRing) ClosestPrecedingFinger(ctx context.Context, in *LookupRequest) (*RPCNode, error) {
@@ -437,9 +452,9 @@ func (r *chordRing) FindSuccessor(ctx context.Context, in *LookupRequest) (*RPCN
 }
 
 func (r *chordRing) GetPredecessor(ctx context.Context, in *empty.Empty) (*PredecessorReply, error) {
-	r.lock.RLock()
+	r.predecessorLock.RLock()
 	predecessor := r.predecessor
-	r.lock.RUnlock()
+	r.predecessorLock.RUnlock()
 
 	if predecessor == nil {
 		return &PredecessorReply{Valid: false}, nil
@@ -447,18 +462,19 @@ func (r *chordRing) GetPredecessor(ctx context.Context, in *empty.Empty) (*Prede
 
 	return &PredecessorReply{
 		Valid: true,
-		Node: predecessor.rpcNode(),
+		Node:  predecessor.rpcNode(),
 	}, nil
 }
 
 func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	nPrime := in.node()
+
+	r.predecessorLock.Lock()
 	if r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
 		r.predecessor = &nPrime
 	}
+	r.predecessorLock.Unlock()
+
 	return new(empty.Empty), nil
 }
 
@@ -484,16 +500,16 @@ func (r *chordRing) askToFixFingers() {
 func (r *chordRing) periodicActionWorker() {
 	for {
 		select {
-			case <- r.stopped:
-				return
-			case <- r.stabiliseQueue:
-				if err := r.stabilize(); err != nil {
-					log.Printf("Stabilise failed %v", err);
-				}
-			case <- r.fixFingersQueue:
-				if err := r.fixFingers(); err != nil {
-					log.Printf("Fix fingers failed %v", err);
-				}
+		case <-r.stopped:
+			return
+		case <-r.stabiliseQueue:
+			if err := r.stabilize(); err != nil {
+				log.Printf("Stabilise failed %v", err)
+			}
+		case <-r.fixFingersQueue:
+			if err := r.fixFingers(); err != nil {
+				log.Printf("Fix fingers failed %v", err)
+			}
 		}
 	}
 }
@@ -504,12 +520,12 @@ func (r *chordRing) periodicTicker() {
 
 	for {
 		select {
-			case <- r.stopped:
-				return
-			case <- stabiliseTicker.C:
-				r.askToStabilise()
-			case <- fixFingersTicker.C:
-				r.askToFixFingers()
+		case <-r.stopped:
+			return
+		case <-stabiliseTicker.C:
+			r.askToStabilise()
+		case <-fixFingersTicker.C:
+			r.askToFixFingers()
 		}
 	}
 }
