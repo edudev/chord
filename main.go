@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	memcachedWrapper "github.com/edudev/chord/memcached"
 	kvserver "github.com/edudev/chord/server"
@@ -39,22 +38,26 @@ func isStable(reply chan bool) {
 	reply <- true
 }
 
+func waitForStability() {
+	// Using blocking channel to wait until
+	// isStable function reply with true
+	reply := make(chan bool)
+	go isStable(reply)
+	<-reply
+}
+
 func createNode(id uint) (server kvserver.ChordServer) {
 	addr := fmt.Sprintf("127.0.0.1:%d", chordPort+uint16(id))
 	server = kvserver.New(addr)
 	return
 }
 
-func addNodesToRing(prevServersList []kvserver.ChordServer, id uint) (newServer kvserver.ChordServer, newServersList []kvserver.ChordServer) {
-	// Using blocking channel to wait until
-	// isStable function reply with true
-	reply := make(chan bool)
-	go isStable(reply)
-	<-reply
-
+func addNodeToRing(prevServersList []kvserver.ChordServer, id uint) (newServer kvserver.ChordServer, newServersList []kvserver.ChordServer) {
 	newServer = createNode(id + 1)
 	newServersList = append(prevServersList, newServer)
+	// TODO remove this once join is available
 	kvserver.SortServersByNodePosition(newServersList)
+	// TODO call join once that method is available
 	newServer.FillFingerTable(newServersList)
 
 	return
@@ -83,7 +86,7 @@ func main() {
 	// getting only the first server node
 	var servers = []kvserver.ChordServer{}
 	var newServer kvserver.ChordServer
-	newServer, servers = addNodesToRing(servers, 0)
+	newServer, servers = addNodeToRing(servers, 0)
 
 	holder := memcachedWrapper.New(&newServer)
 	memcachedServer := memcached.NewServer("127.0.0.1:11211", &holder)
@@ -94,12 +97,13 @@ func main() {
 
 	// Adding node in ring one by one
 	for id := uint(1); id < N; id++ {
-		newServer, servers = addNodesToRing(servers, id)
-		time.Sleep(1 * time.Second)
+		newServer, servers = addNodeToRing(servers, id)
 		listenAndServe(&wg, int(id), &newServer)
+		waitForStability()
 	}
 
 	fmt.Println(servers)
 
 	wg.Wait()
+	// TODO shutdown chord ring (will be needed later)
 }
