@@ -27,7 +27,6 @@ const (
 )
 
 // TODO do fine grained locking (on predecessor, finger table, successor list)
-// TODO let stabilize goroutine receive explicit fix notifications
 // TODO check mutex recursive
 
 // a position should be treated as an opague value.
