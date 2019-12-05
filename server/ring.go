@@ -52,15 +52,14 @@ type chordRing struct {
 
 	myNode node
 
-	fingerTable     [M]node
-	fingerTableLock sync.RWMutex
+	fingerTable        [M]node
+	fingerTableLock    sync.RWMutex
+	nextFingerFixIndex uint
 
-	// TODO `predecessor` should really be an optional instead of a pointer
+	// `predecessor` should really be an optional instead of a pointer
 	predecessor     *node
 	predecessorLock sync.RWMutex
 
-	nextFingerFixIndex uint
-	// successors keeps track of R successors to this node
 	successors     [R](*node)
 	successorsLock sync.RWMutex
 
@@ -357,7 +356,6 @@ func (r *chordRing) fillFingerTable(servers []ChordServer) {
 	r.fingerTableLock.Unlock()
 }
 
-// TODO don't return a pointer
 func (r *chordRing) findSuccessor(keyPos position) (successor node, err error) {
 	log.Printf("getting predecessor of %v", keyPos)
 	predecessor, err := r.findPredecessor(keyPos)
