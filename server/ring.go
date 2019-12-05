@@ -27,8 +27,6 @@ const (
 )
 
 // TODO do fine grained locking (on predecessor, finger table, successor list)
-// TODO keep immediate successor only in fingerTable not also in successors
-// TODO use a list instead of array for successors
 // TODO let stabilize goroutine receive explicit fix notifications
 // TODO check mutex recursive
 
@@ -59,7 +57,7 @@ type chordRing struct {
 	predecessor     *node
 	predecessorLock sync.RWMutex
 
-	successors     [R](*node)
+	successors     [](node)
 	successorsLock sync.RWMutex
 
 	stopped         chan bool
@@ -157,11 +155,23 @@ func (r *chordRing) nodeDied(addr address) {
 		r.predecessor = nil
 	}
 	// update successors
-	for i, successor := range r.successors {
-		if successor.addr == addr {
-			// TODO hint to fix_successors
-			r.successors[i] = nil
+	successorsAffected := false
+	for {
+		breaK := true
+		for i, successor := range r.successors {
+			if successor.addr == addr {
+				r.successors = append(r.successors[:i], r.successors[i+1:]...)
+				successorsAffected = true
+				breaK = false
+				break
+			}
 		}
+		if breaK {
+			break
+		}
+	}
+	if successorsAffected {
+		r.askToStabilise()
 	}
 
 	// fix fingerTable, excluding successor
@@ -181,21 +191,17 @@ func (r *chordRing) nodeDied(addr address) {
 	// fix successor
 	if r.fingerTable[0].addr == addr {
 		// find the next successor
-		var newSuccessor *node
-		newSuccessor = nil
-		for _, successor := range r.successors {
-			if successor != nil {
-				newSuccessor = successor
-				break
-			}
-		}
-		if newSuccessor == nil {
+		if len(r.successors) == 0 {
 			// find the next sucessor finger table
 			// since the finger table is correct as per the above loop,
 			// we can just to the following
-			newSuccessor = &r.fingerTable[1]
+			r.fingerTable[0] = r.fingerTable[1]
+		} else {
+			// pop a successor from the successor list
+			r.fingerTable[0], r.successors = r.successors[0], r.successors[1:]
 		}
-		r.fingerTable[0] = *newSuccessor
+		// need to stabilise since we lost a successor list entry
+		r.askToStabilise()
 	}
 }
 
@@ -236,6 +242,7 @@ func (r *chordRing) stabilize() error {
 
 	xValid, x, e := r.rpcGetPredecessor(context.Background(), successor)
 	if e != nil {
+		r.nodeDied(successor.addr)
 		return e
 	}
 	if xValid { // successor has no predecessor?
@@ -247,18 +254,53 @@ func (r *chordRing) stabilize() error {
 		r.fingerTable[0] = x
 		r.fingerTableLock.Unlock()
 
-		// TODO add to successor list? -> push_front
-		successor = x
+		// add our old successor as the first entry to the successor list
+		r.successorsLock.Lock()
+		r.successors = append([]node{successor}, r.successors...)
+		if len(r.successors) > int(R) {
+			r.successors = r.successors[:len(r.successors)-1]
+		}
+		r.successorsLock.Unlock()
 		// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
 	}
-	_, e = r.getClient(successor.addr).Notify(context.Background(), r.myNode.rpcNode())
-	return nil
+	e = r.rpcNotify(context.Background(), successor, r.myNode)
+
+	return r.fixSuccessors()
 }
 
 // fixes the successor list if need be
-// TODO should be called in stabilize
 func (r *chordRing) fixSuccessors() error {
-	// TODO implement
+	// very dumb version for now: will iteratively add new nodes to successor list
+	r.successorsLock.RLock()
+	numSuccessors := len(r.successors)
+	r.successorsLock.RUnlock()
+	if numSuccessors == int(R) {
+		// we're all good (Y)
+		return nil
+	}
+
+	// TODO more fine grained locking
+	r.successorsLock.Lock()
+	defer r.successorsLock.Unlock()
+	var nextNodeToAsk node
+	if len(r.successors) == 0 {
+		r.fingerTableLock.RLock()
+		nextNodeToAsk = r.fingerTable[0]
+		r.fingerTableLock.RUnlock()
+	} else {
+		nextNodeToAsk = r.successors[len(r.successors)-1]
+	}
+	successorToAdd, e := r.rpcGetSuccessor(context.Background(), nextNodeToAsk)
+	if e != nil {
+		r.nodeDied(nextNodeToAsk.addr)
+		// a new stabilise run will be scheduled by nodeDied
+		return e
+	}
+	r.successors = append(r.successors, successorToAdd)
+	if len(r.successors) != int(R) {
+		// immediately trigger another run in case our list not full yet
+		r.askToStabilise()
+	}
 	return nil
 }
 
