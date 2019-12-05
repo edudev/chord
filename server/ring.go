@@ -50,16 +50,19 @@ type node struct {
 type chordRing struct {
 	server *ChordServer
 
-	myNode      node
-	fingerTable [M]node
+	myNode node
+
+	fingerTable     [M]node
+	fingerTableLock sync.RWMutex
+
 	// TODO `predecessor` should really be an optional instead of a pointer
-	predecessor        *node
+	predecessor     *node
+	predecessorLock sync.RWMutex
+
 	nextFingerFixIndex uint
 	// successors keeps track of R successors to this node
-	successors [R](*node)
-	// TODO rename to fingerTableLock
-	fingerTableLock sync.RWMutex
-	successorsLock  sync.RWMutex
+	successors     [R](*node)
+	successorsLock sync.RWMutex
 
 	stopped         chan bool
 	stabiliseQueue  chan bool
@@ -144,8 +147,10 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 
 // to be called if we realize the node at the given address is gone
 func (r *chordRing) nodeDied(addr address) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.predecessorLock.Lock()
+	defer r.predecessorLock.Unlock()
+	r.fingerTableLock.Lock()
+	defer r.fingerTableLock.Unlock()
 	r.successorsLock.Lock()
 	defer r.successorsLock.Unlock()
 
