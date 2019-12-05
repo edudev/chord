@@ -175,6 +175,7 @@ func (r *chordRing) nodeDied(addr address) {
 	}
 
 	// fix fingerTable, excluding successor
+	notifiedFixFingerRoutine := false
 	for i := M - 1; i > 0; i-- {
 		if r.fingerTable[i].addr == addr {
 			var s node
@@ -184,7 +185,11 @@ func (r *chordRing) nodeDied(addr address) {
 				s = r.fingerTable[i+1]
 			}
 			r.fingerTable[i] = s
-			// TODO hint stabilize
+
+			if !notifiedFixFingerRoutine {
+				r.askToFixFingersAtIndex(i)
+				notifiedFixFingerRoutine = true
+			}
 		}
 	}
 
@@ -563,6 +568,11 @@ func (r *chordRing) Stop() {
 
 func (r *chordRing) askToStabilise() {
 	r.stabiliseQueue <- true
+}
+
+func (r *chordRing) askToFixFingersAtIndex(index uint) {
+	r.nextFingerFixIndex = index
+	r.askToFixFingers()
 }
 
 func (r *chordRing) askToFixFingers() {
