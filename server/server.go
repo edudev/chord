@@ -9,6 +9,14 @@ import (
 
 type address string
 
+func (a address) String() string {
+	str := string(a)
+	if a[:9] == "127.0.0.1" {
+		return str[9:]
+	}
+	return str
+}
+
 type ChordServer struct {
 	ring    *chordRing
 	kvstore *chordKV
@@ -99,12 +107,10 @@ func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
 		return conn
 	}
 
-	log.Printf("connecting to %v", addr)
 	conn, err := grpc.Dial(string(addr), grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
-	log.Printf("connected to client %v", addr)
 
 	// TODO: close the connection at some point
 	return conn

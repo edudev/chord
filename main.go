@@ -75,7 +75,7 @@ type serverType interface {
 func listenAndServe(wg *sync.WaitGroup, i int, server serverType) {
 	wg.Add(1)
 	go func() {
-		log.Printf("do listen and serve %v %v", i, server)
+		//log.Printf("do listen and serve %v %v", i, server)
 		server.ListenAndServe()
 		log.Printf("done listen and serve")
 		wg.Done()

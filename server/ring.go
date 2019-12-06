@@ -3,9 +3,9 @@ package server
 import (
 	"context"
 	hash "crypto/sha1"
+	fmt "fmt"
 	"log"
 	"math/big"
-	"sort"
 	"sync"
 	"time"
 
@@ -33,6 +33,10 @@ const (
 // however, for the finger table operations, it is useful to treat it as a number.
 type position big.Int
 
+func (p position) String() string {
+	return fmt.Sprintf("%049v", ((*big.Int)(&p)).String())[:5]
+}
+
 // compares to positions / spaceship operator
 func cmpPosition(a position, b position) int {
 	return ((*big.Int)(&a)).Cmp((*big.Int)(&b))
@@ -41,6 +45,10 @@ func cmpPosition(a position, b position) int {
 type node struct {
 	addr address
 	pos  position
+}
+
+func (n node) String() string {
+	return fmt.Sprintf("%v@%v", n.addr, n.pos)
 }
 
 type chordRing struct {
@@ -142,6 +150,7 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 
 // to be called if we realize the node at the given address is gone
 func (r *chordRing) nodeDied(addr address) {
+	log.Println("Node died at address: ", addr)
 	r.predecessorLock.Lock()
 	defer r.predecessorLock.Unlock()
 	r.fingerTableLock.Lock()
@@ -240,6 +249,7 @@ func isPosInRangExclusive(left position, element position, right position) bool 
 
 // the stabilize function as defined in the paper
 func (r *chordRing) stabilize() error {
+	log.Printf("[%v] stabilizing...", r.myNode)
 	r.fingerTableLock.RLock()
 	successor := r.fingerTable[0]
 	r.fingerTableLock.RUnlock()
@@ -267,9 +277,11 @@ func (r *chordRing) stabilize() error {
 		r.successorsLock.Unlock()
 		// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
 	}
-	e = r.rpcNotify(context.Background(), successor, r.myNode)
 
-	return r.fixSuccessors()
+	e = r.rpcNotify(context.Background(), successor, r.myNode)
+	e = r.fixSuccessors()
+	log.Printf("[%v] done stabilising", r.myNode)
+	return e
 }
 
 // fixes the successor list if need be
@@ -283,6 +295,7 @@ func (r *chordRing) fixSuccessors() error {
 		return nil
 	}
 
+	log.Printf("[%v] Need to fix our successors, as we have only %v", r.myNode, numSuccessors)
 	// TODO more fine grained locking
 	r.successorsLock.Lock()
 	defer r.successorsLock.Unlock()
@@ -313,7 +326,6 @@ func (r *chordRing) fixSuccessors() error {
 }
 
 func (r *chordRing) getClient(addr address) (client ChordRingClient) {
-	log.Printf("connecting to ring %v", addr)
 	conn := r.server.getClientConn(addr)
 	client = NewChordRingClient(conn)
 	return
@@ -385,7 +397,7 @@ func (r *chordRing) findSuccessor(keyPos position) (successor node, err error) {
 	if err != nil {
 		return
 	}
-	log.Printf("getting successor (final) of %v", predecessor.addr)
+	log.Printf("[%v] getting successor (final) of %v", r.myNode, predecessor.addr)
 	successor, err = r.rpcGetSuccessor(context.Background(), *predecessor)
 	return
 }
@@ -408,12 +420,11 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 	r.fingerTableLock.RUnlock()
 
 	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
-		log.Printf("getting ClosestPrecedingFinger for %v from %v", keyPos, n.addr)
+		log.Printf("%v is not element of (%v, %v]", keyPos, n.pos, successor.pos)
 		n, e = r.rpcClosestPrecedingFinger(context.Background(), n, keyPos)
 		if e != nil {
 			return nil, e
 		}
-		log.Printf("getting successor for %v", n.addr)
 		successor, e = r.rpcGetSuccessor(context.Background(), n)
 		if e != nil {
 			return nil, e
@@ -453,7 +464,9 @@ func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode
 	r.fingerTableLock.RLock()
 	successor := r.fingerTable[0]
 	r.fingerTableLock.RUnlock()
-
+	if successor.addr == r.myNode.addr {
+		log.Printf("########################## returning ourselves as successor!!! %v", r.myNode.addr)
+	}
 	return successor.rpcNode(), nil
 }
 
@@ -462,6 +475,7 @@ func (r *chordRing) rpcGetSuccessor(ctx context.Context, n node) (node, error) {
 	if err != nil {
 		return node{}, err
 	}
+	log.Printf("[%v] Asking %v to get their successor: its %v", r.myNode, n.addr, nodeRPC.Address)
 	return nodeRPC.node(), err
 }
 
@@ -475,6 +489,7 @@ func (r *chordRing) rpcClosestPrecedingFinger(ctx context.Context, n node, p pos
 	if err != nil {
 		return node{}, err
 	}
+	log.Printf("[%v] Asking %v to get closest preceding finger of %v: its %v", r.myNode, n.addr, p, nRPC.Address)
 	return nRPC.node(), nil
 }
 
@@ -488,10 +503,12 @@ func (r *chordRing) FindSuccessor(ctx context.Context, in *LookupRequest) (*RPCN
 }
 
 func (r *chordRing) rpcFindSuccessor(ctx context.Context, addr address, p position) (node, error) {
+	log.Printf("[%v] Asking %v to find successor of %v", r.myNode, addr, p)
 	successorRPC, e := r.getClient(addr).FindSuccessor(ctx, &LookupRequest{Position: position2bytes(p)})
 	if e != nil {
 		return node{}, e
 	}
+	log.Printf("[%v] Asking %v to find successor of %v: its %v!", r.myNode, addr, p, successorRPC.Address)
 	return successorRPC.node(), nil
 }
 
@@ -515,6 +532,11 @@ func (r *chordRing) rpcGetPredecessor(ctx context.Context, n node) (valid bool, 
 	if e != nil {
 		return false, node{}, e
 	}
+	if xRPC.GetValid() {
+		log.Printf("[%v] Getting predecessor of %v returned: %v", r.myNode, n.addr, xRPC.GetNode().Address)
+	} else {
+		log.Printf("[%v] Getting predecessor of %v: is invalid!", r.myNode, n.addr)
+	}
 	return xRPC.GetValid(), xRPC.GetNode().node(), nil
 }
 
@@ -523,6 +545,9 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 
 	r.predecessorLock.Lock()
 	if r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
+		if r.predecessor == nil || r.predecessor.addr != nPrime.addr {
+			log.Printf("[%v] We were notified of the presence of %v and they are now our predecessor!", r.myNode, nPrime.addr)
+		}
 		r.predecessor = &nPrime
 	}
 	r.predecessorLock.Unlock()
@@ -531,6 +556,7 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 }
 
 func (r *chordRing) rpcNotify(ctx context.Context, n node, nodeToBeNotifiedOf node) (err error) {
+	log.Printf("[%v] Notifying %v of the presence of %v", r.myNode, n.addr, nodeToBeNotifiedOf.addr)
 	_, err = r.getClient(n.addr).Notify(ctx, nodeToBeNotifiedOf.rpcNode())
 	return
 }
