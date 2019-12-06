@@ -116,9 +116,9 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 		nextFingerFixIndex: M - 1,
 		predecessor:        nil,
 
-		stopped:         make(chan bool),
-		stabiliseQueue:  make(chan bool),
-		fixFingersQueue: make(chan bool),
+		stopped:         make(chan bool, 2),
+		stabiliseQueue:  make(chan bool, 2),
+		fixFingersQueue: make(chan bool, 2),
 	}
 
 	RegisterChordRingServer(grpcServer, ring)
