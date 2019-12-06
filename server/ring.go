@@ -300,6 +300,10 @@ func (r *chordRing) fixSuccessors() error {
 		// a new stabilise run will be scheduled by nodeDied
 		return e
 	}
+	if successorToAdd.addr == r.myNode.addr {
+		// don't add ourself
+		return nil
+	}
 	r.successors = append(r.successors, successorToAdd)
 	if len(r.successors) != int(R) {
 		// immediately trigger another run in case our list not full yet
