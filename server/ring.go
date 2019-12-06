@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	TICK_STABILISE   = 100 * time.Millisecond
-	TICK_FIX_FINGERS = 500 * time.Millisecond
+	TICK_STABILISE   = 1000 * time.Millisecond
+	TICK_FIX_FINGERS = 5000 * time.Millisecond
 
 	// M as it is used in the paper. M specifies the size of the identifier ring,
 	// which is 2^M in size (M specifies the amount of bits in an identifier).
@@ -179,7 +179,8 @@ func (r *chordRing) nodeDied(addr address) {
 		}
 	}
 	if successorsAffected {
-		r.askToStabilise()
+		// TODO reenable later
+		//r.askToStabilise()
 	}
 
 	// fix fingerTable, excluding successor
@@ -214,7 +215,8 @@ func (r *chordRing) nodeDied(addr address) {
 			r.fingerTable[0], r.successors = r.successors[0], r.successors[1:]
 		}
 		// need to stabilise since we lost a successor list entry
-		r.askToStabilise()
+		// TODO reenable later
+		//r.askToStabilise()
 	}
 }
 
@@ -321,7 +323,8 @@ func (r *chordRing) fixSuccessors() error {
 	r.successors = append(r.successors, successorToAdd)
 	if len(r.successors) != int(R) {
 		// immediately trigger another run in case our list not full yet
-		r.askToStabilise()
+		// TODO disabled for now
+		//r.askToStabilise()
 	}
 	return nil
 }
@@ -345,6 +348,8 @@ func (r *chordRing) setFixIndexToNextIndex() (k uint) {
 
 // the fix finger function according to the paper
 func (r *chordRing) fixFingers() error {
+	// TODO disabled for now
+	return nil
 	k := r.setFixIndexToNextIndex()
 	n := r.calculateFingerTablePosition(k)
 	successor, e := r.findSuccessor(n)

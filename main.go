@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	memcachedWrapper "github.com/edudev/chord/memcached"
 	kvserver "github.com/edudev/chord/server"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	N         uint   = 64
+	N         uint   = 5
 	chordPort uint16 = 21211
 )
 
@@ -34,7 +35,9 @@ func isStable(reply chan bool) {
 	// }
 	// return false
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
+	// TODO remove sleep
+	// this makes the logs a bit easier to follow for now
+	time.Sleep(10 * time.Second)
 	reply <- true
 }
 
