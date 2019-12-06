@@ -82,6 +82,12 @@ func listenAndServe(wg *sync.WaitGroup, i int, server serverType) {
 	}()
 }
 
+func shutdown(servers []kvserver.ChordServer) {
+	for _, server := range servers {
+		server.Stop()
+	}
+}
+
 func main() {
 	log.SetPrefix("TRACE: ")
 	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
@@ -110,5 +116,5 @@ func main() {
 	fmt.Println(servers)
 
 	wg.Wait()
-	// TODO shutdown chord ring (will be needed later)
+	shutdown(servers)
 }
