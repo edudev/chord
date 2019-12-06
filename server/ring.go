@@ -555,6 +555,12 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 		r.predecessor = &nPrime
 	}
 	r.predecessorLock.Unlock()
+	// if we are the only node in the ring: learn of the new node immediately!
+	r.fingerTableLock.Lock()
+	if r.fingerTable[0].addr == r.myNode.addr {
+		r.fingerTable[0] = nPrime
+	}
+	r.fingerTableLock.Unlock()
 
 	return new(empty.Empty), nil
 }
