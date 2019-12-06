@@ -260,22 +260,23 @@ func (r *chordRing) stabilize() error {
 		return e
 	}
 	if xValid { // successor has no predecessor?
-		return nil
-	}
+		if isPosInRangExclusive(r.myNode.pos, x.pos, successor.pos) {
+			log.Printf("[%v] A new node joined as our successor: %v", r.myNode, x)
+			r.fingerTableLock.Lock()
+			r.fingerTable[0] = x
+			r.fingerTableLock.Unlock()
 
-	if isPosInRangExclusive(r.myNode.pos, x.pos, successor.pos) {
-		r.fingerTableLock.Lock()
-		r.fingerTable[0] = x
-		r.fingerTableLock.Unlock()
-
-		// add our old successor as the first entry to the successor list
-		r.successorsLock.Lock()
-		r.successors = append([]node{successor}, r.successors...)
-		if len(r.successors) > int(R) {
-			r.successors = r.successors[:len(r.successors)-1]
+			if successor.addr != r.myNode.addr {
+				// add our old successor as the first entry to the successor list
+				r.successorsLock.Lock()
+				r.successors = append([]node{successor}, r.successors...)
+				if len(r.successors) > int(R) {
+					r.successors = r.successors[:len(r.successors)-1]
+				}
+				r.successorsLock.Unlock()
+			}
+			// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
 		}
-		r.successorsLock.Unlock()
-		// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
 	}
 
 	e = r.rpcNotify(context.Background(), successor, r.myNode)
