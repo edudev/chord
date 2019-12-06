@@ -1,9 +1,9 @@
 package server
 
 import (
-	"log"
 	"context"
 	"errors"
+	"log"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -145,4 +145,7 @@ func (c *chordKV) remoteDelete(remoteNode address, key string) (err error) {
 	}
 
 	return
+}
+
+func (c *chordKV) Stop() {
 }

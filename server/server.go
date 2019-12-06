@@ -71,12 +71,19 @@ func New(myAddress string) (server ChordServer) {
 }
 
 func (s *ChordServer) ListenAndServe() error {
+	s.ring.ListenAndServe()
+
 	if err := s.grpcServer.Serve(*s.listener); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 		return err
 	}
 
 	return nil
+}
+
+func (s *ChordServer) Stop() {
+	s.kvstore.Stop()
+	s.ring.Stop()
 }
 
 // TODO: remove this in the future
