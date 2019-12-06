@@ -393,7 +393,10 @@ func (r *chordRing) successorToPositionInServers(servers []ChordServer, p positi
 }
 
 func (r *chordRing) findSuccessor(keyPos position) (successor node, err error) {
-	log.Printf("getting predecessor of %v", keyPos)
+	if r.fingerTable[0].addr == r.myNode.addr {
+		return r.myNode, nil
+	}
+	log.Printf("[%v] getting predecessor of %v", r.myNode, keyPos)
 	predecessor, err := r.findPredecessor(keyPos)
 	if err != nil {
 		return
