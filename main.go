@@ -53,12 +53,17 @@ func createNode(id uint) (server kvserver.ChordServer) {
 }
 
 func addNodeToRing(prevServersList []kvserver.ChordServer, id uint) (newServer kvserver.ChordServer, newServersList []kvserver.ChordServer) {
+	var nodeToJoinTo *string
+	nodeToJoinTo = nil
+	if len(prevServersList) > 0 {
+		a := prevServersList[0].Address()
+		nodeToJoinTo = &a
+	}
+
 	newServer = createNode(id + 1)
 	newServersList = append(prevServersList, newServer)
-	// TODO remove this once join is available
-	kvserver.SortServersByNodePosition(newServersList)
-	// TODO call join once that method is available
-	newServer.FillFingerTable(newServersList)
+
+	newServer.Join(nodeToJoinTo)
 
 	return
 }

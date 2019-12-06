@@ -379,29 +379,6 @@ func (r *chordRing) successorToPositionInServers(servers []ChordServer, p positi
 	return servers[0]
 }
 
-type sortByPosition []ChordServer
-
-func (a sortByPosition) Len() int      { return len(a) }
-func (a sortByPosition) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a sortByPosition) Less(i, j int) bool {
-	return cmpPosition(a[i].ring.myNode.pos, a[j].ring.myNode.pos) < 0
-}
-
-func SortServersByNodePosition(servers []ChordServer) {
-	sort.Sort(sortByPosition(servers))
-}
-
-func (r *chordRing) fillFingerTable(servers []ChordServer) {
-	r.fingerTableLock.Lock()
-
-	for k := uint(0); k < M; k++ {
-		q := r.calculateFingerTablePosition(k)
-		r.fingerTable[k] = r.successorToPositionInServers(servers, q).ring.myNode
-	}
-
-	r.fingerTableLock.Unlock()
-}
-
 func (r *chordRing) findSuccessor(keyPos position) (successor node, err error) {
 	log.Printf("getting predecessor of %v", keyPos)
 	predecessor, err := r.findPredecessor(keyPos)

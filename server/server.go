@@ -86,9 +86,12 @@ func (s *ChordServer) Stop() {
 	s.ring.Stop()
 }
 
-// TODO: remove this in the future
-func (s *ChordServer) FillFingerTable(servers []ChordServer) {
-	s.ring.fillFingerTable(servers)
+func (s *ChordServer) Join(otherNode *string) {
+	s.ring.join((*address)(otherNode))
+}
+
+func (s *ChordServer) Address() string {
+	return string(s.ring.myNode.addr)
 }
 
 func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
