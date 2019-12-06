@@ -456,12 +456,12 @@ func (r *chordRing) fingerTableClosestPredecessor(keyPosition position) node {
 	r.fingerTableLock.RLock()
 	defer r.fingerTableLock.RUnlock()
 
-	for i := uint(0); i < M-1; i++ {
-		if isSuccessorResponsibleForPosition(r.fingerTable[i].pos, keyPosition, r.fingerTable[i+1].pos) {
+	for i := int(M - 1); i >= 0; i-- {
+		if isPosInRangExclusive(r.myNode.pos, r.fingerTable[i].pos, keyPosition) {
 			return r.fingerTable[i]
 		}
 	}
-	return r.fingerTable[M-1]
+	return r.myNode
 }
 
 func (r *chordRing) GetSuccessor(ctx context.Context, in *empty.Empty) (*RPCNode, error) {
