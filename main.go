@@ -13,7 +13,7 @@ import (
 
 const (
 	N         uint   = 5
-	chordPort uint16 = 21211
+	chordPort uint16 = 21210
 )
 
 func isStable(reply chan bool) {
@@ -63,7 +63,7 @@ func addNodeToRing(prevServersList []kvserver.ChordServer, id uint) (newServer k
 		nodeToJoinTo = &a
 	}
 
-	newServer = createNode(id + 1)
+	newServer = createNode(id)
 	newServersList = append(prevServersList, newServer)
 
 	newServer.Join(nodeToJoinTo)
@@ -78,7 +78,7 @@ type serverType interface {
 func listenAndServe(wg *sync.WaitGroup, i int, server serverType) {
 	wg.Add(1)
 	go func() {
-		//log.Printf("do listen and serve %v %v", i, server)
+		// log.Printf("do listen and serve %v %v", i, server)
 		server.ListenAndServe()
 		log.Printf("done listen and serve")
 		wg.Done()
@@ -113,7 +113,7 @@ func main() {
 	for id := uint(1); id < N; id++ {
 		newServer, servers = addNodeToRing(servers, id)
 		listenAndServe(&wg, int(id), &newServer)
-		waitForStability()
+		// waitForStability()
 	}
 
 	fmt.Println(servers)
