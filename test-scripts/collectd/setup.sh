@@ -1,53 +1,53 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -ve
 
-wget -N https://download.savannah.gnu.org/releases/freetype/freetype-2.10.1.tar.gz
-tar -xvf freetype-2.10.1.tar.gz
-freetype2_dir="${HOME}/chord/freetype2/"
-cd freetype-2.10.1/
-./configure --prefix="${freetype2_dir}"
-make
-make install
-export PKG_CONFIG_PATH="${freetype2_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
-export CPPFLAGS="-I${freetype2_dir}/include/ ${CPPFLAGS}"
-export LDFLAGS="-L${freetype2_dir}/lib/ ${LDFLAGS}"
-cd ../
+#wget -N https://download.savannah.gnu.org/releases/freetype/freetype-2.10.1.tar.gz
+#tar -xvf freetype-2.10.1.tar.gz
+#freetype2_dir="${HOME}/chord/freetype2/"
+#cd freetype-2.10.1/
+#./configure --prefix="${freetype2_dir}"
+#make
+#make install
+#export PKG_CONFIG_PATH="${freetype2_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
+#export CPPFLAGS="-I${freetype2_dir}/include/ ${CPPFLAGS}"
+#export LDFLAGS="-L${freetype2_dir}/lib/ ${LDFLAGS}"
+#cd ../
 
-wget -N https://www.cairographics.org/releases/pixman-0.38.4.tar.gz
-tar -xvf pixman-0.38.4.tar.gz
-pixman_dir="${HOME}/chord/pixman/"
-cd pixman-0.38.4/
-./configure --prefix="${pixman_dir}"
-make
-make install
-export PKG_CONFIG_PATH="${pixman_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
-export CPPFLAGS="-I${pixman_dir}/include/ ${CPPFLAGS}"
-export LDFLAGS="-L${pixman_dir}/lib/ ${LDFLAGS}"
-cd ../
+#wget -N https://www.cairographics.org/releases/pixman-0.38.4.tar.gz
+#tar -xvf pixman-0.38.4.tar.gz
+#pixman_dir="${HOME}/chord/pixman/"
+#cd pixman-0.38.4/
+#./configure --prefix="${pixman_dir}"
+#make
+#make install
+#export PKG_CONFIG_PATH="${pixman_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
+#export CPPFLAGS="-I${pixman_dir}/include/ ${CPPFLAGS}"
+#export LDFLAGS="-L${pixman_dir}/lib/ ${LDFLAGS}"
+#cd ../
 
-wget -N https://www.cairographics.org/releases/cairo-1.16.0.tar.xz
-tar -xvf cairo-1.16.0.tar.xz
-cairo_dir="${HOME}/chord/cairo/"
-cd cairo-1.16.0/
-./configure --prefix="${cairo_dir}"
-make
-make install
-export PKG_CONFIG_PATH="${cairo_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
-export CPPFLAGS="-I${cairo_dir}/include/cairo/ ${CPPFLAGS}"
-export LDFLAGS="-L${cairo_dir}/lib/ ${LDFLAGS}"
-cd ../
+#wget -N https://www.cairographics.org/releases/cairo-1.16.0.tar.xz
+#tar -xvf cairo-1.16.0.tar.xz
+#cairo_dir="${HOME}/chord/cairo/"
+#cd cairo-1.16.0/
+#./configure --prefix="${cairo_dir}"
+#make
+#make install
+#export PKG_CONFIG_PATH="${cairo_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
+#export CPPFLAGS="-I${cairo_dir}/include/cairo/ ${CPPFLAGS}"
+#export LDFLAGS="-L${cairo_dir}/lib/ ${LDFLAGS}"
+#cd ../
 
-wget -N http://ftp.gnome.org/pub/GNOME/sources/pango/1.28/pango-1.28.4.tar.gz
-tar -xvf pango-1.28.4.tar.gz
-pango_dir="${HOME}/chord/pango/"
-cd pango-1.28.4/
-./configure --prefix="${pango_dir}"
-make
-make install
-export PKG_CONFIG_PATH="${pango_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
-export CPPFLAGS="-I${pango_dir}/include/pango-1.0/ ${CPPFLAGS}"
-export LDFLAGS="-L${pango_dir}/lib/ ${LDFLAGS}"
-cd ../
+#wget -N http://ftp.gnome.org/pub/GNOME/sources/pango/1.28/pango-1.28.4.tar.gz
+#tar -xvf pango-1.28.4.tar.gz
+#pango_dir="${HOME}/chord/pango/"
+#cd pango-1.28.4/
+#./configure --prefix="${pango_dir}"
+#make
+#make install
+#export PKG_CONFIG_PATH="${pango_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
+#export CPPFLAGS="-I${pango_dir}/include/pango-1.0/ ${CPPFLAGS}"
+#export LDFLAGS="-L${pango_dir}/lib/ ${LDFLAGS}"
+#cd ../
 
 
 # wget ftp://ftp.pcre.org/pub/pcre/pcre-8.43.zip
@@ -64,9 +64,10 @@ wget -N https://oss.oetiker.ch/rrdtool/pub/rrdtool-1.7.2.tar.gz
 tar -xvf rrdtool-1.7.2.tar.gz
 rrdtool_dir="${HOME}/chord/rrdtool/"
 cd rrdtool-1.7.2
-./configure --prefix="${rrdtool_dir}"
+./configure --prefix="${rrdtool_dir}" --disable-{rrdcached,examples,docs,perl,ruby,lua,tcl,python}
 make
-make install
+make install-exec
+make install-data || true
 export PKG_CONFIG_PATH="${rrdtool_dir}/lib/pkgconfig/:${PKG_CONFIG_PATH}"
 export CPPFLAGS="-I${rrdtool_dir}/include/ ${CPPFLAGS}"
 export LDFLAGS="-L${rrdtool_dir}/lib/ ${LDFLAGS}"
@@ -89,4 +90,6 @@ sed -i.bak \
     -e 's/^#*\(LoadPlugin logfile\)/\1/g'
 
 
-"${collectd_dir}/sbin/collectd" -f -C "${collectd_dir}/etc/collectd.conf"
+# "${collectd_dir}/sbin/collectd" -f -C "${collectd_dir}/etc/collectd.conf"
+
+exit 0
