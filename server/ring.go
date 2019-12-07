@@ -5,6 +5,7 @@ import (
 	hash "crypto/sha1"
 	fmt "fmt"
 	"log"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -15,7 +16,7 @@ import (
 
 const (
 	TICK_STABILISE   = 100 * time.Millisecond
-	TICK_FIX_FINGERS = 5000 * time.Millisecond
+	TICK_FIX_FINGERS = 500 * time.Millisecond
 
 	// M as it is used in the paper. M specifies the size of the identifier ring,
 	// which is 2^M in size (M specifies the amount of bits in an identifier).
@@ -68,7 +69,7 @@ type chordRing struct {
 
 	stopped         chan bool
 	stabiliseQueue  chan bool
-	fixFingersQueue chan bool
+	fixFingersQueue chan uint
 
 	UnimplementedChordRingServer
 }
@@ -117,7 +118,7 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 
 		stopped:         make(chan bool, 2),
 		stabiliseQueue:  make(chan bool, 2),
-		fixFingersQueue: make(chan bool, 2),
+		fixFingersQueue: make(chan uint, 2),
 	}
 
 	RegisterChordRingServer(grpcServer, ring)
@@ -195,7 +196,7 @@ func (r *chordRing) nodeDied(addr address) {
 			r.fingerTable[i] = s
 
 			if !notifiedFixFingerRoutine {
-				r.askToFixFingersAtIndex(i)
+				r.askToFixFingers(i)
 				notifiedFixFingerRoutine = true
 			}
 		}
@@ -350,7 +351,7 @@ func (r *chordRing) getClient(addr address) (client ChordRingClient) {
 }
 
 // sets the nextFingerFixIndex to the next value and returns the old one
-func (r *chordRing) setFixIndexToNextIndex() (k uint) {
+func (r *chordRing) rotateNextFingerFixIndex() (k uint) {
 	k = r.nextFingerFixIndex
 	if r.nextFingerFixIndex == 0 {
 		r.nextFingerFixIndex = M - 1
@@ -360,21 +361,48 @@ func (r *chordRing) setFixIndexToNextIndex() (k uint) {
 	return
 }
 
+func wrapNextFingerFixIndex(k uint) uint {
+	if k == math.MaxUint64 {
+		return M - 1
+	}
+	if k == M {
+		return 0
+	}
+
+	return k
+}
+
 // the fix finger function according to the paper
-func (r *chordRing) fixFingers() error {
-	// TODO disabled for now
-	return nil
-	k := r.setFixIndexToNextIndex()
+func (r *chordRing) fixFingers(k uint) error {
+	log.Printf("[%v] fixing fingers... %5v", r.myNode, k)
 	n := r.calculateFingerTablePosition(k)
-	successor, e := r.findSuccessor(n)
+	finger, e := r.findSuccessor(n)
 	if e != nil {
 		return e
 	}
 
+	shouldRepeatFixFingers := false
+
 	r.fingerTableLock.Lock()
-	r.fingerTable[k] = successor
+	if r.fingerTable[k].addr != finger.addr {
+		// TODO: k = log2(wrap(finger.pos - r.myNode.pos))
+		// then all relevant fingers: k, k-1, k-2, k-3, etc.
+		// until r.fingerTable[k] is correct
+		// when this is done, remove shouldRepeatFixFingers
+		// NOTE: this needs to handle both cases where finger is a newly
+		// joined node, and the case where the old finger has died
+
+		log.Printf("[%v] fixing finger %5v: %v", r.myNode, k, finger)
+		r.fingerTable[k] = finger
+		shouldRepeatFixFingers = true
+	}
 	r.fingerTableLock.Unlock()
 
+	if shouldRepeatFixFingers {
+		r.askToFixFingers(wrapNextFingerFixIndex(k - 1))
+	}
+
+	log.Printf("[%v] fixing fingers... %5v done", r.myNode, k)
 	return nil
 }
 
@@ -426,8 +454,9 @@ func (r *chordRing) findSuccessor(keyPos position) (successor node, err error) {
 }
 
 // checks whether keyPos € (p, successor]
+// if p == successor, then return true (treat as whole ring)
 func isSuccessorResponsibleForPosition(p position, keyPos position, successor position) bool {
-	if cmpPosition(p, successor) <= 0 {
+	if cmpPosition(p, successor) < 0 {
 		return cmpPosition(keyPos, p) > 0 && cmpPosition(keyPos, successor) <= 0
 	}
 
@@ -610,13 +639,8 @@ func (r *chordRing) askToStabilise() {
 	r.stabiliseQueue <- true
 }
 
-func (r *chordRing) askToFixFingersAtIndex(index uint) {
-	r.nextFingerFixIndex = index
-	r.askToFixFingers()
-}
-
-func (r *chordRing) askToFixFingers() {
-	r.fixFingersQueue <- true
+func (r *chordRing) askToFixFingers(index uint) {
+	r.fixFingersQueue <- index
 }
 
 func (r *chordRing) periodicActionWorker() {
@@ -628,8 +652,8 @@ func (r *chordRing) periodicActionWorker() {
 			if err := r.stabilize(); err != nil {
 				log.Printf("Stabilise failed %v", err)
 			}
-		case <-r.fixFingersQueue:
-			if err := r.fixFingers(); err != nil {
+		case index := <-r.fixFingersQueue:
+			if err := r.fixFingers(index); err != nil {
 				log.Printf("Fix fingers failed %v", err)
 			}
 		}
@@ -647,7 +671,8 @@ func (r *chordRing) periodicTicker() {
 		case <-stabiliseTicker.C:
 			r.askToStabilise()
 		case <-fixFingersTicker.C:
-			r.askToFixFingers()
+			k := r.rotateNextFingerFixIndex()
+			r.askToFixFingers(k)
 		}
 	}
 }

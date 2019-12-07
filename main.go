@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	N         uint   = 64
+	N         uint   = 5
 	chordPort uint16 = 21210
 )
 
