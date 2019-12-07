@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	TICK_STABILISE   = 1000 * time.Millisecond
+	TICK_STABILISE   = 100 * time.Millisecond
 	TICK_FIX_FINGERS = 5000 * time.Millisecond
 
 	// M as it is used in the paper. M specifies the size of the identifier ring,
@@ -26,7 +26,6 @@ const (
 	R uint = 5
 )
 
-// TODO do fine grained locking (on predecessor, finger table, successor list)
 // TODO check mutex recursive
 
 // a position should be treated as an opague value.
@@ -150,7 +149,7 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 
 // to be called if we realize the node at the given address is gone
 func (r *chordRing) nodeDied(addr address) {
-	log.Println("Node died at address: ", addr)
+	log.Printf("Node died at address: ", addr)
 	r.predecessorLock.Lock()
 	defer r.predecessorLock.Unlock()
 	r.fingerTableLock.Lock()
@@ -567,6 +566,9 @@ func (r *chordRing) rpcGetPredecessor(ctx context.Context, n node) (valid bool, 
 func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, error) {
 	nPrime := in.node()
 
+	// TODO: maybe do an rlock & check
+	// then if we don't have to update the predecessor just runlock
+	// but if we do have to update the predecessor, runlock, rlock and repeat the check
 	r.predecessorLock.Lock()
 	if r.predecessor == nil || isPosInRangExclusivePreferWhole(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
 		if r.predecessor == nil || r.predecessor.addr != nPrime.addr {

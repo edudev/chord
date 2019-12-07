@@ -117,7 +117,6 @@ func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
 	defer s.clientCacheLock.Unlock()
 
 	if conn, ok := s.clientCache[addr]; ok {
-		s.clientCacheLock.Unlock()
 		return conn
 	}
 
