@@ -40,3 +40,5 @@ cd libmemcached-$LMEMCACHED_VER/
 cd $HOME
 rm -rf libmemcached-$LMEMCACHED_VER/
 rm libmemcached-$LMEMCACHED_VER.tar.gz
+
+"$(dirname ${0})/collectd/setup.sh"
