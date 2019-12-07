@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"sync"
@@ -12,7 +13,6 @@ import (
 )
 
 const (
-	N         uint   = 5
 	chordPort uint16 = 21211
 )
 
@@ -49,21 +49,21 @@ func waitForStability() {
 	<-reply
 }
 
-func createNode(id uint) (server kvserver.ChordServer) {
-	addr := fmt.Sprintf("127.0.0.1:%d", chordPort+uint16(id))
+func createNode(localAddr string, id uint) (server kvserver.ChordServer) {
+	addr := fmt.Sprintf("%v:%d", localAddr, chordPort+uint16(id))
 	server = kvserver.New(addr)
 	return
 }
 
-func addNodeToRing(prevServersList []kvserver.ChordServer, id uint) (newServer kvserver.ChordServer, newServersList []kvserver.ChordServer) {
-	var nodeToJoinTo *string
-	nodeToJoinTo = nil
-	if len(prevServersList) > 0 {
-		a := prevServersList[0].Address()
-		nodeToJoinTo = &a
+func addNodeToRing(localAddr string, nodeToJoinTo *string, prevServersList []kvserver.ChordServer, id uint) (newServer kvserver.ChordServer, newServersList []kvserver.ChordServer) {
+	if nodeToJoinTo == nil {
+		if len(prevServersList) > 0 {
+			a := prevServersList[0].Address()
+			nodeToJoinTo = &a
+		}
 	}
 
-	newServer = createNode(id + 1)
+	newServer = createNode(localAddr, id+1)
 	newServersList = append(prevServersList, newServer)
 
 	newServer.Join(nodeToJoinTo)
@@ -96,14 +96,27 @@ func main() {
 	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
 	log.Println("log initialised")
 
+	nFlag := flag.Uint("N", 64, "number of nodes to run in this process")
+	joinFlag := flag.String("join", "", "an existing node to join to")
+	localAddrFlag := flag.String("addr", "127.0.0.1", "local IP address to bind to")
+
+	flag.Parse()
+
+	N := *nFlag
+	nodeToJoinTo := &*joinFlag
+	if *joinFlag == "" {
+		nodeToJoinTo = nil
+	}
+	localAddr := *localAddrFlag
+
 	// Initialising an empty server array and
 	// getting only the first server node
 	var servers = []kvserver.ChordServer{}
 	var newServer kvserver.ChordServer
-	newServer, servers = addNodeToRing(servers, 0)
+	newServer, servers = addNodeToRing(localAddr, nodeToJoinTo, servers, 0)
 
 	holder := memcachedWrapper.New(&newServer)
-	memcachedServer := memcached.NewServer("127.0.0.1:11211", &holder)
+	memcachedServer := memcached.NewServer(localAddr+":11211", &holder)
 
 	var wg sync.WaitGroup
 	listenAndServe(&wg, -1, memcachedServer)
@@ -111,7 +124,7 @@ func main() {
 
 	// Adding node in ring one by one
 	for id := uint(1); id < N; id++ {
-		newServer, servers = addNodeToRing(servers, id)
+		newServer, servers = addNodeToRing(localAddr, nodeToJoinTo, servers, id)
 		listenAndServe(&wg, int(id), &newServer)
 		waitForStability()
 	}
