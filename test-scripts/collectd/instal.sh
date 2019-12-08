@@ -9,12 +9,19 @@ cd collectd-5.10.0
 make
 make install
 
-sed -i.bak \
+cp "${collectd_dir}/etc/collectd.conf" "${collectd_dir}/etc/collectd.conf.orig"
+
+sed \
     -e 's/${exec_prefix}/${prefix}/g' \
-    -e "s/\${prefix}/${collectd_dir//\//\\/}/g" "${collectd_dir}/etc/collectd.conf" \
+    -e "s/\${prefix}/${collectd_dir//\//\\/}/g" \
     -e 's/^#\(BaseDir\|PIDFile\|PluginDir\|TypesDB\)/\1/g' \
     -e 's/^\(LoadPlugin syslog\)/#\1/g' \
     -e 's/^#*\(LoadPlugin logfile\)/\1/g' \
-    -e 's/^#*\(LoadPlugin csv\)/\1/g'
+    -e 's/^#*\(LoadPlugin csv\)/\1/g' \
+    -e 's/^#* *<Plugin csv> *$/<Plugin csv>\n  StoreRates true\n<\/Plugin>/g' \
+    -e 's/^#* *<Plugin cpu> *$/<Plugin cpu>\n  ReportByState false\n<\/Plugin>/g' \
+    -e 's/^#* *<Plugin memory> *$/<Plugin memory>\n  ValuesAbsolute true\n  ValuesPercentage false\n<\/Plugin>/g' \
+    -e 's/^#* *<Plugin interface> *$/<Plugin interface>\n  Interface "eth0"\n<\/Plugin>/g' \
+    "${collectd_dir}/etc/collectd.conf.orig" > "${collectd_dir}/etc/collectd.conf"
 
 "${collectd_dir}/sbin/collectd" -f -C "${collectd_dir}/etc/collectd.conf"
