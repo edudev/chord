@@ -400,22 +400,7 @@ func (r *chordRing) fixFingers(k uint) error {
 
 // calculates n + 2^k mod 2^M
 func (r *chordRing) calculateFingerTablePosition(k uint) position {
-	// n is our node position (as in the paper)
-	n := r.myNode.pos
-	// one = 1
-	one := big.NewInt(1)
-	// max = 2^M - 1
-	var max big.Int
-	max.Lsh(one, M)
-	max.Sub(&max, one)
-	var q big.Int
-	// q = 2^k
-	q.Lsh(one, k)
-	// q = n + q = n + 2^k
-	q.Add(&q, (*big.Int)(&n))
-	// q = q AND max = q mod max = q mod 2^M = n + 2^k mod 2^M
-	q.And(&q, &max)
-	return position(q)
+	return calculateFingerTablePosition(r.myNode, k)
 }
 
 // finds the successor to the given position in the given array of servers
@@ -598,7 +583,7 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 		r.predecessor = &nPrime
 	}
 	r.predecessorLock.Unlock()
-  
+
 	/*
 		// if we are the only node in the ring: learn of the new node immediately!
 		r.fingerTableLock.Lock()
@@ -615,6 +600,33 @@ func (r *chordRing) rpcNotify(ctx context.Context, n node, nodeToBeNotifiedOf no
 	log.Printf("[%v] Notifying %v of the presence of %v", r.myNode, n.addr, nodeToBeNotifiedOf.addr)
 	_, err = r.getClient(n.addr).Notify(ctx, nodeToBeNotifiedOf.rpcNode())
 	return
+}
+
+func (r *chordRing) GetFingerTable(ctx context.Context, in *empty.Empty) (*ListOfNodes, error) {
+	r.fingerTableLock.RLock()
+	defer r.fingerTableLock.RUnlock()
+
+	nodes := make([]*RPCNode, len(r.fingerTable))
+	for i, n := range r.fingerTable {
+		nodes[i] = n.rpcNode()
+	}
+
+	return &ListOfNodes{Nodes: nodes}, nil
+}
+
+func (r *chordRing) GetSuccessorList(ctx context.Context, in *empty.Empty) (*ListOfNodes, error) {
+	r.fingerTableLock.RLock()
+	defer r.fingerTableLock.RUnlock()
+	r.successorsLock.RLock()
+	defer r.successorsLock.RUnlock()
+
+	nodes := make([]*RPCNode, len(r.successors)+1)
+	nodes[0] = r.fingerTable[0].rpcNode()
+	for i, n := range r.successors {
+		nodes[i+1] = n.rpcNode()
+	}
+
+	return &ListOfNodes{Nodes: nodes}, nil
 }
 
 func (r *chordRing) ListenAndServe() error {
