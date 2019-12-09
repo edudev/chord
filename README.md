@@ -4,6 +4,17 @@
 go get
 ```
 
+# Local environment setup
+If you plan on runing chord with many nodes (40+) in a single process,
+add the following lines
+```
+*         hard    nofile      500000
+*         soft    nofile      500000
+root      hard    nofile      500000
+root      soft    nofile      500000
+```
+as the end of `/etc/security/limits.conf`
+
 # Building
 
 ```
