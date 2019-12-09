@@ -244,18 +244,8 @@ func (r *chordRing) initFingerTable(nodeToJoin address) error {
 }
 
 // checks whether element € (left, right), respecting wrapping
-// if left == right, assume we mean the empty set, not the whole ring
-func isPosInRangExclusive(left position, element position, right position) bool {
-	if cmpPosition(left, right) <= 0 {
-		return cmpPosition(element, left) > 0 && cmpPosition(element, right) < 0
-	}
-
-	return cmpPosition(element, left) > 0 || cmpPosition(element, right) < 0
-}
-
-// checks whether element € (left, right), respecting wrapping
 // if left == right, assume we mean the whole ring, not the empty set
-func isPosInRangExclusivePreferWhole(left position, element position, right position) bool {
+func isPosInRangExclusive(left position, element position, right position) bool {
 	if cmpPosition(left, right) < 0 {
 		return cmpPosition(element, left) > 0 && cmpPosition(element, right) < 0
 	}
@@ -276,7 +266,7 @@ func (r *chordRing) stabilize() error {
 		return e
 	}
 	if xValid { // successor has no predecessor?
-		if isPosInRangExclusivePreferWhole(r.myNode.pos, x.pos, successor.pos) {
+		if isPosInRangExclusive(r.myNode.pos, x.pos, successor.pos) {
 			log.Printf("[%v] A new node joined as our successor: %v", r.myNode, x)
 			r.fingerTableLock.Lock()
 			r.fingerTable[0] = x
@@ -408,7 +398,7 @@ func (r *chordRing) fixFingers(k uint) error {
 	return nil
 }
 
-// calculates n + 2^k mod (2^M - 1)
+// calculates n + 2^k mod 2^M
 func (r *chordRing) calculateFingerTablePosition(k uint) position {
 	// n is our node position (as in the paper)
 	n := r.myNode.pos
@@ -423,7 +413,7 @@ func (r *chordRing) calculateFingerTablePosition(k uint) position {
 	q.Lsh(one, k)
 	// q = n + q = n + 2^k
 	q.Add(&q, (*big.Int)(&n))
-	// q = q AND max = q mod max = q mod (2^M - 1) = n + 2^k mod (2^M - 1)
+	// q = q AND max = q mod max = q mod 2^M = n + 2^k mod 2^M
 	q.And(&q, &max)
 	return position(q)
 }
@@ -601,7 +591,7 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 	// then if we don't have to update the predecessor just runlock
 	// but if we do have to update the predecessor, runlock, rlock and repeat the check
 	r.predecessorLock.Lock()
-	if r.predecessor == nil || isPosInRangExclusivePreferWhole(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
+	if r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
 		if r.predecessor == nil || r.predecessor.addr != nPrime.addr {
 			log.Printf("[%v] We were notified of the presence of %v and they are now our predecessor!", r.myNode, nPrime.addr)
 		}
