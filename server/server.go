@@ -105,6 +105,15 @@ func (s *ChordServer) Address() string {
 	return string(s.ring.myNode.addr)
 }
 
+func GetGRPCConnection(addr string) (conn *grpc.ClientConn) {
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+
+	return conn
+}
+
 func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
 	s.clientCacheLock.RLock()
 	if conn, ok := s.clientCache[addr]; ok {
@@ -120,11 +129,7 @@ func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
 		return conn
 	}
 
-	conn, err := grpc.Dial(string(addr), grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-
+	conn = GetGRPCConnection(string(addr))
 	s.clientCache[addr] = conn
 
 	// TODO: close the connection at some point
