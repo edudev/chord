@@ -20,7 +20,7 @@ func CreatePerfectFingertable(forNodeAddr string, otherNodes []string) (fingerTa
 }
 
 func CreatePerfectSuccessorList(forNodeAddr string, otherNodes []string) (successors []string) {
-	successors = make([]string, R+1)
+	successors = make([]string, R)
 	forNode := addr2node(address(forNodeAddr))
 	nodes := make([]node, len(otherNodes))
 	for i, addr := range otherNodes {

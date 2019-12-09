@@ -64,8 +64,9 @@ type chordRing struct {
 	predecessor     *node
 	predecessorLock sync.RWMutex
 
-	successors     [](node)
-	successorsLock sync.RWMutex
+	successors            [](node)
+	successorsLock        sync.RWMutex
+	nextSuccessorFixIndex uint
 
 	stopped         chan bool
 	stabiliseQueue  chan bool
@@ -111,10 +112,11 @@ func (r *chordRing) lookup(key string) (addr address, err error) {
 
 func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Server) *chordRing {
 	ring := &chordRing{
-		server:             server,
-		myNode:             addr2node(myAddress),
-		nextFingerFixIndex: M - 1,
-		predecessor:        nil,
+		server:                server,
+		myNode:                addr2node(myAddress),
+		nextFingerFixIndex:    M - 1,
+		nextSuccessorFixIndex: 0,
+		predecessor:           nil,
 
 		stopped:         make(chan bool, 2),
 		stabiliseQueue:  make(chan bool, 2),
@@ -272,16 +274,12 @@ func (r *chordRing) stabilize() error {
 			r.fingerTable[0] = x
 			r.fingerTableLock.Unlock()
 
+			// make sure to fix our successor list
+			r.successorsLock.Lock()
+			r.nextFingerFixIndex = 0
+			r.successorsLock.Unlock()
+
 			/*
-				if successor.addr != r.myNode.addr {
-					// add our old successor as the first entry to the successor list
-					r.successorsLock.Lock()
-					r.successors = append([]node{successor}, r.successors...)
-					if len(r.successors) > int(R) {
-						r.successors = r.successors[:len(r.successors)-1]
-					}
-					r.successorsLock.Unlock()
-				}
 				// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
 			*/
 		}
@@ -294,44 +292,81 @@ func (r *chordRing) stabilize() error {
 	return e
 }
 
+// makes sure the given node is in the successor list if there is space for it
+// may add more successors than necessary, should be removed after calling this function
+// CALLER MUST WRITE-LOCK r.successors and READ-LOCK on fingerTable!
+func (r *chordRing) ensureNodeInSuccessorList(n node) {
+	if n.addr == r.myNode.addr {
+		return
+	}
+	// check whether it fits inbetween our immediate succesor and first list entry
+	if len(r.successors) > 0 && isPosInRangExclusive(r.fingerTable[0].pos, n.pos, r.successors[0].pos) {
+		r.successors = append([]node{n}, r.successors...)
+		return
+	}
+	// check whether it fits inbetween existing nodes
+	for i := 0; i < len(r.successors)-1; i++ {
+		if r.successors[i].addr == n.addr {
+			// already in list, nothing to do
+			return
+		}
+		if isPosInRangExclusive(r.successors[i].pos, n.pos, r.successors[i+1].pos) {
+			if n.addr == r.successors[i+1].addr {
+				// already in list, nothing to do
+				return
+			}
+			// insert here
+			r.successors = append(r.successors[:i], append([]node{n}, r.successors[i:]...)...)
+			break
+		}
+	}
+	// it did not fit in front, it did not fit in between, so we will put it in back
+	if len(r.successors) < int(R-1) {
+		r.successors = append(r.successors, n)
+	}
+}
+
 // fixes the successor list if need be
 func (r *chordRing) fixSuccessors() error {
 	// very dumb version for now: will iteratively add new nodes to successor list
 	r.successorsLock.RLock()
-	numSuccessors := len(r.successors)
-	r.successorsLock.RUnlock()
-	if numSuccessors == int(R) {
-		// we're all good (Y)
-		return nil
+	numSuccessors := uint(len(r.successors))
+	index := r.nextSuccessorFixIndex
+	if index > numSuccessors {
+		index = numSuccessors
 	}
-
-	log.Printf("[%v] Need to fix our successors, as we have only %v", r.myNode, numSuccessors)
-	// TODO more fine grained locking
-	r.successorsLock.Lock()
-	defer r.successorsLock.Unlock()
-	var nextNodeToAsk node
-	if len(r.successors) == 0 {
+	var nextSuccessorToFix node
+	if index == 0 {
 		r.fingerTableLock.RLock()
-		nextNodeToAsk = r.fingerTable[0]
+		nextSuccessorToFix = r.fingerTable[0]
 		r.fingerTableLock.RUnlock()
 	} else {
-		nextNodeToAsk = r.successors[len(r.successors)-1]
+		nextSuccessorToFix = r.successors[index-1]
 	}
-	successorToAdd, e := r.rpcGetSuccessor(context.Background(), nextNodeToAsk)
+	r.successorsLock.RUnlock()
+
+	successorToAdd, e := r.rpcGetSuccessor(context.Background(), nextSuccessorToFix)
 	if e != nil {
-		r.nodeDied(nextNodeToAsk.addr)
+		r.nodeDied(nextSuccessorToFix.addr)
 		// a new stabilise run will be scheduled by nodeDied
 		return e
 	}
-	if successorToAdd.addr == r.myNode.addr {
-		// don't add ourself
-		return nil
+
+	r.successorsLock.Lock()
+	r.fingerTableLock.RLock()
+	r.ensureNodeInSuccessorList(nextSuccessorToFix)
+	r.ensureNodeInSuccessorList(successorToAdd)
+	r.rotateNextSuccessorFixIndex()
+	if len(r.successors) > int(R)-1 {
+		r.successors = r.successors[:int(R)-1]
 	}
-	r.successors = append(r.successors, successorToAdd)
-	if len(r.successors) != int(R) {
+	numSuccessors = uint(len(r.successors))
+	r.successorsLock.Unlock()
+	r.fingerTableLock.RUnlock()
+
+	if numSuccessors != R-1 {
 		// immediately trigger another run in case our list not full yet
-		// TODO disabled for now
-		//r.askToStabilise()
+		r.askToStabilise()
 	}
 	return nil
 }
@@ -362,6 +397,13 @@ func wrapNextFingerFixIndex(k uint) uint {
 	}
 
 	return k
+}
+
+// sets the nextSuccessorFixIndex to the next value and returns the old one
+func (r *chordRing) rotateNextSuccessorFixIndex() (k uint) {
+	k = r.nextFingerFixIndex
+	r.nextSuccessorFixIndex = (k + 1) % (R - 1)
+	return
 }
 
 // the fix finger function according to the paper
