@@ -21,6 +21,7 @@
 
 # binary files
 /chord
+/stabilise
 
 # protocol buffers
 *.pb.go

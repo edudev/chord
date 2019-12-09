@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	chordPort uint16 = 21211
+	N         uint   = 64
+	chordPort uint16 = 21210
 )
 
 func isStable(reply chan bool) {
@@ -49,6 +50,7 @@ func waitForStability() {
 	<-reply
 }
 
+
 func createNode(localAddr string, id uint) (server kvserver.ChordServer) {
 	addr := fmt.Sprintf("%v:%d", localAddr, chordPort+uint16(id))
 	server = kvserver.New(addr)
@@ -63,7 +65,7 @@ func addNodeToRing(localAddr string, nodeToJoinTo *string, prevServersList []kvs
 		}
 	}
 
-	newServer = createNode(localAddr, id+1)
+	newServer = createNode(localAddr, id)
 	newServersList = append(prevServersList, newServer)
 
 	newServer.Join(nodeToJoinTo)
@@ -78,7 +80,7 @@ type serverType interface {
 func listenAndServe(wg *sync.WaitGroup, i int, server serverType) {
 	wg.Add(1)
 	go func() {
-		//log.Printf("do listen and serve %v %v", i, server)
+		// log.Printf("do listen and serve %v %v", i, server)
 		server.ListenAndServe()
 		log.Printf("done listen and serve")
 		wg.Done()
@@ -126,7 +128,7 @@ func main() {
 	for id := uint(1); id < N; id++ {
 		newServer, servers = addNodeToRing(localAddr, nodeToJoinTo, servers, id)
 		listenAndServe(&wg, int(id), &newServer)
-		waitForStability()
+		// waitForStability()
 	}
 
 	fmt.Println(servers)

@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"net"
+	"sync"
 
 	"google.golang.org/grpc"
 )
@@ -21,9 +22,11 @@ type ChordServer struct {
 	ring    *chordRing
 	kvstore *chordKV
 
-	listener    *net.Listener
-	grpcServer  *grpc.Server
-	clientCache map[address]*grpc.ClientConn
+	listener   *net.Listener
+	grpcServer *grpc.Server
+
+	clientCache     map[address]*grpc.ClientConn
+	clientCacheLock sync.RWMutex
 }
 
 func (s *ChordServer) Get(key string) (value string, err error) {
@@ -102,15 +105,32 @@ func (s *ChordServer) Address() string {
 	return string(s.ring.myNode.addr)
 }
 
+func GetGRPCConnection(addr string) (conn *grpc.ClientConn) {
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+
+	return conn
+}
+
 func (s *ChordServer) getClientConn(addr address) (conn *grpc.ClientConn) {
+	s.clientCacheLock.RLock()
+	if conn, ok := s.clientCache[addr]; ok {
+		s.clientCacheLock.RUnlock()
+		return conn
+	}
+	s.clientCacheLock.RUnlock()
+
+	s.clientCacheLock.Lock()
+	defer s.clientCacheLock.Unlock()
+
 	if conn, ok := s.clientCache[addr]; ok {
 		return conn
 	}
 
-	conn, err := grpc.Dial(string(addr), grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
+	conn = GetGRPCConnection(string(addr))
+	s.clientCache[addr] = conn
 
 	// TODO: close the connection at some point
 	return conn
