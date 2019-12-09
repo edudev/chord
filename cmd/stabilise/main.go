@@ -61,7 +61,6 @@ func checkFingertables(nodeAddresses []string) bool {
 				return false
 			}
 		}
-		log.Printf("Node #%v addr %v has correct fingers!", i, node)
 	}
 	return true
 }
@@ -84,7 +83,6 @@ func checkSuccessorsCorrect(nodes []string) bool {
 				return false
 			}
 		}
-		log.Printf("Node #%v addr %v has correct successors!", i, node)
 	}
 	return true
 }
@@ -120,10 +118,14 @@ func main() {
 			continue
 		}
 
+		log.Print("All nodes have correct successors!")
+
 		if checkFingertable && !checkFingertables(nodes) {
 			time.Sleep(5000 * time.Millisecond)
 			continue
 		}
+
+		log.Print("All nodes have correct fingers!")
 
 		break
 	}
