@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	TICK_STABILISE   = 100 * time.Millisecond
-	TICK_FIX_FINGERS = 500 * time.Millisecond
+	TICK_STABILISE   = 1000 * time.Millisecond
+	TICK_FIX_FINGERS = 5000 * time.Millisecond
 
 	// M as it is used in the paper. M specifies the size of the identifier ring,
 	// which is 2^M in size (M specifies the amount of bits in an identifier).
@@ -150,7 +150,8 @@ func (r *chordRing) join(otherNodeAddr *address) (e error) {
 
 // to be called if we realize the node at the given address is gone
 func (r *chordRing) nodeDied(addr address) {
-	log.Printf("Node died at address: ", addr)
+	log.Println("Node died at address: ", addr)
+
 	r.predecessorLock.Lock()
 	defer r.predecessorLock.Unlock()
 	r.fingerTableLock.Lock()
@@ -297,6 +298,7 @@ func (r *chordRing) stabilize() error {
 	}
 
 	e = r.rpcNotify(context.Background(), successor, r.myNode)
+
 	// e = r.fixSuccessors()
 	log.Printf("[%v] done stabilising", r.myNode)
 	return e
@@ -606,6 +608,7 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 		r.predecessor = &nPrime
 	}
 	r.predecessorLock.Unlock()
+  
 	/*
 		// if we are the only node in the ring: learn of the new node immediately!
 		r.fingerTableLock.Lock()
