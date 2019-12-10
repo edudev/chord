@@ -112,19 +112,23 @@ func main() {
 			continue
 		}
 
-		if checkSuccessors && !checkSuccessorsCorrect(nodes) {
-			time.Sleep(5000 * time.Millisecond)
-			continue
+		if checkSuccessors {
+			if !checkSuccessorsCorrect(nodes) {
+				time.Sleep(5000 * time.Millisecond)
+				continue
+			} else {
+				log.Print("All nodes have correct successors!")
+			}
 		}
 
-		log.Print("All nodes have correct successors!")
-
-		if checkFingertable && !checkFingertables(nodes) {
-			time.Sleep(5000 * time.Millisecond)
-			continue
+		if checkFingertable {
+			if !checkFingertables(nodes) {
+				time.Sleep(5000 * time.Millisecond)
+				continue
+			} else {
+				log.Print("All nodes have correct fingers!")
+			}
 		}
-
-		log.Print("All nodes have correct fingers!")
 
 		break
 	}
