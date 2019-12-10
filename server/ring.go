@@ -185,8 +185,7 @@ func (r *chordRing) nodeDied(addr address) {
 		}
 	}
 	if successorsAffected {
-		// TODO reenable later
-		//r.askToStabilise()
+		r.askToStabilise()
 	}
 
 	// fix fingerTable, excluding successor
@@ -221,8 +220,7 @@ func (r *chordRing) nodeDied(addr address) {
 			r.fingerTable[0], r.successors = r.successors[0], r.successors[1:]
 		}
 		// need to stabilise since we lost a successor list entry
-		// TODO reenable later
-		//r.askToStabilise()
+		r.askToStabilise()
 	}
 }
 
