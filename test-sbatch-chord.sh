@@ -32,7 +32,7 @@ rm -rf "${HOME}/chord/collectd/var/lib/collectd/"*".cm.cluster"
 
 CHORD_EXEC="${HOME}/opt/bin/chord"
 echo $'\n'"Starting Chord..."
-CHORD_ARGS=( -N 2 -addr "${A[0]}" )
+CHORD_ARGS=( -N 2 -addr "${A[0]}.ib.cluster" )
 cat >"chord_0.sh" <<EOT
 #!/usr/bin/env bash
 "${collectd_dir}/sbin/collectd" -f -C "${collectd_dir}/etc/collectd.conf" &
@@ -45,7 +45,7 @@ echo "Chord started on: ${A[0]}"$'\n'"Output of Chord: ${WORKDIR}/chord_out0"
 
 (n=1
 while [ $n -lt $IC ]; do
-CHORD_ARGS=( -N 2 -addr "${A[${n}]}" -join "${A[0]}:21210" )
+CHORD_ARGS=( -N 2 -addr "${A[${n}]}.ib.cluster" -join "${A[0]}.ib.cluster:21210" )
 cat >"chord_${n}.sh" <<EOT
 #!/usr/bin/env bash
 "${collectd_dir}/sbin/collectd" -f -C "${collectd_dir}/etc/collectd.conf" &
@@ -60,7 +60,7 @@ done)
 
 STABILISE_EXEC="${HOME}/opt/bin/stabilise"
 echo $'\n'"Starting Stabilise..."
-STABILISE_ARGS=( "${A[0]}:21210" "$(( IC * 2 ))" )
+STABILISE_ARGS=( "${A[0]}.ib.cluster:21210" "$(( IC * 2 ))" )
 srun "-N1" -w "${B[0]}" "$STABILISE_EXEC" "${STABILISE_ARGS[@]}" >"${WORKDIR}/stabilise_out" 2>&1
 echo "Stabilise done on: ${B[0]}."
 
@@ -70,7 +70,7 @@ MEMTIER_B_EXEC="${HOME}/opt/bin/memtier_benchmark"
 echo $'\n'"Starting Memtier Benchmark..."
 (n=0
 while [ $n -lt $IC ]; do
-MEMTIER_B_ARGS=( -s "${A[${n}]}" -p 11211 -P memcache_text -d 1024 -x 1 -t "$THRD" -c "$CONN" --test-time 10 )
+MEMTIER_B_ARGS=( -s "${A[${n}]}.ib.cluster" -p 11211 -P memcache_text -d 1024 -x 1 -t "$THRD" -c "$CONN" --test-time 10 )
 cat >"memtier_${n}.sh" <<EOT
 #!/usr/bin/env bash
 #hostname
@@ -96,7 +96,7 @@ MEMSLAP_EXEC="${HOME}/opt/bin/memaslap"
 echo $'\n'"Starting Memaslap..."
 (n=0
 while [ $n -lt $IC ]; do
-MEMSLAP_ARGS=( -s "${A[${n}]}:11211" -S 1s -T "$THRD" -c "$(( THRD * CONN ))" -t 10s )
+MEMSLAP_ARGS=( -s "${A[${n}]}.ib.cluster:11211" -S 1s -T "$THRD" -c "$(( THRD * CONN ))" -t 10s )
 cat >"memslap_${n}.sh" <<EOT
 #!/usr/bin/env bash
 #hostname
