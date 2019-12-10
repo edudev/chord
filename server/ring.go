@@ -165,7 +165,6 @@ func (r *chordRing) nodeDied(addr address) {
 	defer r.fingerTableLock.Unlock()
 
 	if r.predecessor != nil && addr == r.predecessor.addr {
-		// TODO may want to trigger a predecessor update immediately
 		r.predecessor = nil
 	}
 	// update successors
