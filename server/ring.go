@@ -331,7 +331,7 @@ func (r *chordRing) stabilize() error {
 
 	e = r.rpcNotify(context.Background(), successor, r.myNode)
 
-	// e = r.fixSuccessors()
+	e = r.fixSuccessors()
 	log.Printf("[%v] done stabilising", r.myNode)
 	return e
 }
