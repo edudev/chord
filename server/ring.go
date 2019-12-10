@@ -17,6 +17,9 @@ import (
 // LearnNodes specifies whether we want to aggresively learn new nodes for finger table
 var LearnNodes bool
 
+// IntelligentFixFingers specifies whether we try to smartly fix fingers
+var IntelligentFixFingers bool
+
 const (
 	TICK_STABILISE   = 1000 * time.Millisecond
 	TICK_FIX_FINGERS = 5000 * time.Millisecond
@@ -724,6 +727,9 @@ func (r *chordRing) askToStabilise() {
 }
 
 func (r *chordRing) askToFixFingers(index uint) {
+	if !IntelligentFixFingers {
+		return
+	}
 	select {
 	case r.fixFingersQueue <- index:
 	default:

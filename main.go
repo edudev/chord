@@ -101,11 +101,13 @@ func main() {
 	nFlag := flag.Uint("N", 64, "number of nodes to run in this process")
 	joinFlag := flag.String("join", "", "an existing node to join to")
 	localAddrFlag := flag.String("addr", "127.0.0.1", "local IP address to bind to")
-	learNodesFlag := flag.Bool("learn_nodes", true, "whether to aggresively learn nodes for fingers")
+	learnNodesFlag := flag.Bool("learn_nodes", false, "whether to aggresively learn nodes for fingers")
+	intelligentFixFingersFlag := flag.Bool("fix_fingers", false, "whether to intelligently fix fingers")
 
 	flag.Parse()
 
-	kvserver.LearnNodes = *learNodesFlag
+	kvserver.LearnNodes = *learnNodesFlag
+	kvserver.IntelligentFixFingers = *intelligentFixFingersFlag
 
 	N := *nFlag
 	nodeToJoinTo := &*joinFlag
