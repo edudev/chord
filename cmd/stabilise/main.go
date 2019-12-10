@@ -111,6 +111,7 @@ func checkSuccessorsCorrect(nodes []string) (incorrectSuccessors int) {
 				incorrectSuccessors++
 			}
 		}
+		incorrectSuccessors += len(correctSuccessorList) - len(list.GetNodes())
 	}
 	return
 }
@@ -144,7 +145,7 @@ func main() {
 		if checkSuccessors || n == 0 {
 			incorrectSuccessors = checkSuccessorsCorrect(nodes)
 			if incorrectSuccessors > 0 {
-
+				log.Print("Incorrect succesors: ", incorrectSuccessors)
 			} else {
 				log.Print("All nodes have correct successors!")
 			}
