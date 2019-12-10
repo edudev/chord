@@ -61,9 +61,10 @@ type chordRing struct {
 
 	myNode node
 
-	fingerTable        [M]node
-	fingerTableLock    sync.RWMutex
-	nextFingerFixIndex uint
+	fingerTable          [M]node
+	fingerTablePositions [M]position
+	fingerTableLock      sync.RWMutex
+	nextFingerFixIndex   uint
 
 	// `predecessor` should really be an optional instead of a pointer
 	predecessor     *node
@@ -127,6 +128,10 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 		stopped:         make(chan bool, 2),
 		stabiliseQueue:  make(chan bool, 2),
 		fixFingersQueue: make(chan uint, 200),
+	}
+
+	for i := range ring.fingerTablePositions {
+		ring.fingerTablePositions[i] = calculateFingerTablePosition(ring.myNode, uint(i))
 	}
 
 	RegisterChordRingServer(grpcServer, ring)
@@ -473,7 +478,7 @@ func (r *chordRing) fixFingers(k uint) error {
 
 // calculates n + 2^k mod 2^M
 func (r *chordRing) calculateFingerTablePosition(k uint) position {
-	return calculateFingerTablePosition(r.myNode, k)
+	return r.fingerTablePositions[k]
 }
 
 // finds the successor to the given position in the given array of servers
