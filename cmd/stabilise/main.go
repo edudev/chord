@@ -73,11 +73,10 @@ func checkSuccessorsCorrect(nodes []string) bool {
 		list, e := client.GetSuccessorList(context.Background(), new(empty.Empty))
 		if e != nil {
 			log.Fatalf("Can't get successor list: %v", e)
-			return false
 		}
 
 		correctSuccessorList := kvserver.CreatePerfectSuccessorList(node, nodes)
-		for k, successor := range list.Nodes {
+		for k, successor := range list.GetNodes() {
 			if successor.Address != correctSuccessorList[k] {
 				log.Printf("Node #%v addr %v has incorrect successor at index %v: %v instead of %v", i, node, k, successor.Address, correctSuccessorList[k])
 				return false

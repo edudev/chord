@@ -276,7 +276,7 @@ func (r *chordRing) stabilize() error {
 
 			// make sure to fix our successor list
 			r.successorsLock.Lock()
-			r.nextFingerFixIndex = 0
+			r.nextSuccessorFixIndex = 0
 			r.successorsLock.Unlock()
 
 			/*
