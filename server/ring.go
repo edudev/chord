@@ -51,6 +51,8 @@ func (n node) String() string {
 	return fmt.Sprintf("%v@%v", n.addr, n.pos)
 }
 
+// IMPORTANT regarding locking in this file:
+// always lock in the following order if you need multiple mutexes: predecessorLock, successorLock, fingerTableLock
 type chordRing struct {
 	server *ChordServer
 
@@ -156,10 +158,10 @@ func (r *chordRing) nodeDied(addr address) {
 
 	r.predecessorLock.Lock()
 	defer r.predecessorLock.Unlock()
-	r.fingerTableLock.Lock()
-	defer r.fingerTableLock.Unlock()
 	r.successorsLock.Lock()
 	defer r.successorsLock.Unlock()
+	r.fingerTableLock.Lock()
+	defer r.fingerTableLock.Unlock()
 
 	if r.predecessor != nil && addr == r.predecessor.addr {
 		// TODO may want to trigger a predecessor update immediately
@@ -651,10 +653,10 @@ func (r *chordRing) GetFingerTable(ctx context.Context, in *empty.Empty) (*ListO
 }
 
 func (r *chordRing) GetSuccessorList(ctx context.Context, in *empty.Empty) (*ListOfNodes, error) {
-	r.fingerTableLock.RLock()
-	defer r.fingerTableLock.RUnlock()
 	r.successorsLock.RLock()
 	defer r.successorsLock.RUnlock()
+	r.fingerTableLock.RLock()
+	defer r.fingerTableLock.RUnlock()
 
 	nodes := make([]*RPCNode, len(r.successors)+1)
 	nodes[0] = r.fingerTable[0].rpcNode()
