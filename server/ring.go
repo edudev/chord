@@ -345,16 +345,18 @@ func (r *chordRing) fixSuccessors() error {
 	}
 
 	r.successorsLock.Lock()
+
 	r.fingerTableLock.RLock()
 	r.ensureNodeInSuccessorList(nextSuccessorToFix)
 	r.ensureNodeInSuccessorList(successorToAdd)
+	r.fingerTableLock.RUnlock()
+
 	r.rotateNextSuccessorFixIndex()
 	if len(r.successors) > int(R)-1 {
 		r.successors = r.successors[:int(R)-1]
 	}
 	numSuccessors = uint(len(r.successors))
 	r.successorsLock.Unlock()
-	r.fingerTableLock.RUnlock()
 
 	if numSuccessors != R-1 {
 		// immediately trigger another run in case our list not full yet
