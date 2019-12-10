@@ -118,6 +118,7 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 		myNode:                addr2node(myAddress),
 		nextFingerFixIndex:    M - 1,
 		nextSuccessorFixIndex: 0,
+		successors:            make([]node, 0, R-1),
 		predecessor:           nil,
 
 		stopped:         make(chan bool, 100),
