@@ -535,10 +535,12 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 		log.Printf("%v is not element of (%v, %v]", keyPos, n.pos, successor.pos)
 		n, e = r.rpcClosestPrecedingFinger(context.Background(), n, keyPos)
 		if e != nil {
+			r.nodeDied(n.addr)
 			return nil, e
 		}
 		successor, e = r.rpcGetSuccessor(context.Background(), n)
 		if e != nil {
+			r.nodeDied(n.addr)
 			return nil, e
 		}
 	}
