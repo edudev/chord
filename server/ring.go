@@ -14,6 +14,9 @@ import (
 	"google.golang.org/grpc"
 )
 
+// LearnNodes specifies whether we want to aggresively learn new nodes for finger table
+var LearnNodes bool
+
 const (
 	TICK_STABILISE   = 1000 * time.Millisecond
 	TICK_FIX_FINGERS = 5000 * time.Millisecond
@@ -223,8 +226,37 @@ func (r *chordRing) nodeDied(addr address) {
 	}
 }
 
-func (r *chordRing) initFingerTable(nodeToJoin address) error {
-	successor, e := r.rpcFindSuccessor(context.Background(), nodeToJoin, r.myNode.pos)
+func (r *chordRing) learnNode(n node) {
+	var replacementIndices []int
+	// 1. collect potential replacement indices
+	r.fingerTableLock.RLock()
+	for k, finger := range r.fingerTable {
+		// skip successor
+		if k == 0 {
+			continue
+		}
+		p := r.calculateFingerTablePosition(uint(k))
+		if isPosInRangExclusive(p, n.pos, finger.pos) {
+			replacementIndices = append(replacementIndices, k)
+		}
+	}
+	r.fingerTableLock.RUnlock()
+
+	if len(replacementIndices) > 0 {
+		// 2. replace indices if still correct
+		r.fingerTableLock.Lock()
+		for _, k := range replacementIndices {
+			p := r.calculateFingerTablePosition(uint(k))
+			if isPosInRangExclusive(p, n.pos, r.fingerTable[k].pos) {
+				r.fingerTable[k] = n
+			}
+		}
+		r.fingerTableLock.Unlock()
+	}
+}
+
+func (r *chordRing) initFingerTable(nodeToJoinAddress address) error {
+	successor, e := r.rpcFindSuccessor(context.Background(), nodeToJoinAddress, r.myNode.pos)
 	if e != nil {
 		return e
 	}
@@ -235,11 +267,13 @@ func (r *chordRing) initFingerTable(nodeToJoin address) error {
 
 	r.fingerTableLock.Lock()
 	for i := uint(0); i < M; i++ {
-		// TODO: this isn't actually correct...
-		// we should take into account the positions
-		r.fingerTable[i] = successor
+		r.fingerTable[i] = r.myNode
 	}
 	r.fingerTableLock.Unlock()
+
+	r.learnNode(successor)
+	nodeToJoin := addr2node(nodeToJoinAddress)
+	r.learnNode(nodeToJoin)
 
 	// TODO fill successors during join
 	return nil
@@ -274,14 +308,14 @@ func (r *chordRing) stabilize() error {
 			r.fingerTable[0] = x
 			r.fingerTableLock.Unlock()
 
+			if LearnNodes {
+				r.learnNode(x)
+			}
+
 			// make sure to fix our successor list
 			r.successorsLock.Lock()
 			r.nextSuccessorFixIndex = 0
 			r.successorsLock.Unlock()
-
-			/*
-				// TODO/INTERESTING shall we also replace other entries occupied by the same node in the finger table?
-			*/
 		}
 	}
 
@@ -428,6 +462,9 @@ func (r *chordRing) fixFingers(k uint) error {
 
 	if shouldRepeatFixFingers {
 		r.askToFixFingers(wrapNextFingerFixIndex(k - 1))
+		if LearnNodes {
+			r.learnNode(finger)
+		}
 	}
 
 	log.Printf("[%v] fixing fingers... %5v done", r.myNode, k)
@@ -621,17 +658,10 @@ func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, erro
 			r.predecessor = &nPrime
 		}
 		r.predecessorLock.Unlock()
-
-	}
-
-	/*
-		// if we are the only node in the ring: learn of the new node immediately!
-		r.fingerTableLock.Lock()
-		if r.fingerTable[0].addr == r.myNode.addr {
-			r.fingerTable[0] = nPrime
+		if LearnNodes {
+			r.learnNode(nPrime)
 		}
-		r.fingerTableLock.Unlock()
-	*/
+	}
 
 	return new(empty.Empty), nil
 }
