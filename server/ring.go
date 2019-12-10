@@ -272,7 +272,7 @@ func (r *chordRing) initFingerTable(nodeToJoinAddress address) error {
 
 	r.fingerTableLock.Lock()
 	for i := uint(0); i < M; i++ {
-		r.fingerTable[i] = r.myNode
+		r.fingerTable[i] = successor
 	}
 	r.fingerTableLock.Unlock()
 
