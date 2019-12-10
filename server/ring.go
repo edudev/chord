@@ -611,17 +611,21 @@ func (r *chordRing) rpcGetPredecessor(ctx context.Context, n node) (valid bool, 
 func (r *chordRing) Notify(ctx context.Context, in *RPCNode) (*empty.Empty, error) {
 	nPrime := in.node()
 
-	// TODO: maybe do an rlock & check
-	// then if we don't have to update the predecessor just runlock
-	// but if we do have to update the predecessor, runlock, rlock and repeat the check
-	r.predecessorLock.Lock()
-	if r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
-		if r.predecessor == nil || r.predecessor.addr != nPrime.addr {
-			log.Printf("[%v] We were notified of the presence of %v and they are now our predecessor!", r.myNode, nPrime.addr)
+	r.predecessorLock.RLock()
+	if !(r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos)) {
+		r.predecessorLock.RUnlock()
+	} else {
+		r.predecessorLock.RUnlock()
+		r.predecessorLock.Lock()
+		if r.predecessor == nil || isPosInRangExclusive(r.predecessor.pos, nPrime.pos, r.myNode.pos) {
+			if r.predecessor == nil || r.predecessor.addr != nPrime.addr {
+				log.Printf("[%v] We were notified of the presence of %v and they are now our predecessor!", r.myNode, nPrime.addr)
+			}
+			r.predecessor = &nPrime
 		}
-		r.predecessor = &nPrime
+		r.predecessorLock.Unlock()
+
 	}
-	r.predecessorLock.Unlock()
 
 	/*
 		// if we are the only node in the ring: learn of the new node immediately!
