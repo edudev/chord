@@ -398,7 +398,7 @@ func wrapNextFingerFixIndex(k uint) uint {
 
 // sets the nextSuccessorFixIndex to the next value and returns the old one
 func (r *chordRing) rotateNextSuccessorFixIndex() (k uint) {
-	k = r.nextFingerFixIndex
+	k = r.nextSuccessorFixIndex
 	r.nextSuccessorFixIndex = (k + 1) % R
 	return
 }
