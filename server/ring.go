@@ -306,15 +306,7 @@ func (r *chordRing) ensureNodeInSuccessorList(n node) {
 	}
 	// check whether it fits inbetween existing nodes
 	for i := 0; i < len(r.successors)-1; i++ {
-		if r.successors[i].addr == n.addr {
-			// already in list, nothing to do
-			return
-		}
 		if isPosInRangExclusive(r.successors[i].pos, n.pos, r.successors[i+1].pos) {
-			if n.addr == r.successors[i+1].addr {
-				// already in list, nothing to do
-				return
-			}
 			// insert here
 			r.successors = append(r.successors[:i], append([]node{n}, r.successors[i:]...)...)
 			break
