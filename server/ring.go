@@ -121,9 +121,9 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 		successors:            make([]node, 0, R-1),
 		predecessor:           nil,
 
-		stopped:         make(chan bool, 100),
-		stabiliseQueue:  make(chan bool, 100),
-		fixFingersQueue: make(chan uint, 100),
+		stopped:         make(chan bool, 2),
+		stabiliseQueue:  make(chan bool, 2),
+		fixFingersQueue: make(chan uint, 200),
 	}
 
 	RegisterChordRingServer(grpcServer, ring)
@@ -680,11 +680,21 @@ func (r *chordRing) Stop() {
 }
 
 func (r *chordRing) askToStabilise() {
-	r.stabiliseQueue <- true
+	select {
+	case r.stabiliseQueue <- true:
+	default:
+		// we are already asked to fix -> ignore
+	}
 }
 
 func (r *chordRing) askToFixFingers(index uint) {
-	r.fixFingersQueue <- index
+	select {
+	case r.fixFingersQueue <- index:
+	default:
+		// Finger queue full, should never happen!
+		// however, as this is best-effort anyways
+		// just ignore this and move on
+	}
 }
 
 func (r *chordRing) periodicActionWorker() {
@@ -715,8 +725,16 @@ func (r *chordRing) periodicTicker() {
 		case <-stabiliseTicker.C:
 			r.askToStabilise()
 		case <-fixFingersTicker.C:
-			k := r.rotateNextFingerFixIndex()
-			r.askToFixFingers(k)
+			if len(r.fixFingersQueue) == 0 {
+				k := r.rotateNextFingerFixIndex()
+				select {
+				case r.fixFingersQueue <- k:
+				default:
+					r.nextFingerFixIndex = k
+					// our fix finger queue is already full
+					// just continue with normal fixing next tick
+				}
+			}
 		}
 	}
 }
