@@ -61,7 +61,6 @@ done)
 STABILISE_EXEC="${HOME}/opt/bin/stabilise"
 echo $'\n'"Starting Stabilise..."
 STABILISE_ARGS=( "${A[0]}:21210" "$(( IC * 2 ))" )
-echo ayyy stabilise args lol "${STABILISE_ARGS[@]}"
 srun "-N1" -w "${B[0]}" "$STABILISE_EXEC" "${STABILISE_ARGS[@]}" >"${WORKDIR}/stabilise_out" 2>&1
 echo "Stabilise done on: ${B[0]}."
 
