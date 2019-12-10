@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/grpc"
 
 	kvserver "github.com/edudev/chord/server"
 )
@@ -16,13 +18,38 @@ var bootstrapAddr string
 var checkFingertable bool
 var checkSuccessors bool
 
+var startTime time.Time
+var timeSet bool
+
+var clientCache map[string](*grpc.ClientConn)
+
+func getClientConn(addr string) (conn *grpc.ClientConn) {
+	if conn, ok := clientCache[addr]; ok {
+		return conn
+	}
+
+	if conn, ok := clientCache[addr]; ok {
+		return conn
+	}
+
+	conn = kvserver.GetGRPCConnection(string(addr))
+	clientCache[addr] = conn
+
+	// TODO: close the connection at some point
+	return conn
+}
+
 func traverseSuccessors(bootstrapAddr string) (nodesFound []string) {
 	nextNodeAddr := bootstrapAddr
 
 	nodesFound = []string{bootstrapAddr}
 
 	for {
-		conn := kvserver.GetGRPCConnection(nextNodeAddr)
+		conn := getClientConn(nextNodeAddr)
+		if !timeSet {
+			startTime = time.Now()
+			timeSet = true
+		}
 		client := kvserver.NewChordRingClient(conn)
 
 		nodeRPC, err := client.GetSuccessor(context.Background(), new(empty.Empty))
@@ -43,31 +70,33 @@ func traverseSuccessors(bootstrapAddr string) (nodesFound []string) {
 	return
 }
 
-func checkFingertables(nodeAddresses []string) bool {
+func checkFingertables(nodeAddresses []string) (incorrectEntries int) {
+
 	for i, node := range nodeAddresses {
-		conn := kvserver.GetGRPCConnection(node)
+		conn := getClientConn(node)
 		client := kvserver.NewChordRingClient(conn)
 
 		list, e := client.GetFingerTable(context.Background(), new(empty.Empty))
 		if e != nil {
 			log.Fatalf("Can't get fingertable: %v", e)
-			return false
+			return
 		}
 
 		correctFingerTable := kvserver.CreatePerfectFingertable(node, nodeAddresses)
 		for k, correctAddr := range correctFingerTable {
 			if list.Nodes[k].Address != correctAddr {
 				log.Printf("Node #%v addr %v has incorrect finger at index %v: %v instead of %v", i, node, k, list.Nodes[k].Address, correctAddr)
-				return false
+				incorrectEntries++
 			}
 		}
 	}
-	return true
+	return
 }
 
-func checkSuccessorsCorrect(nodes []string) bool {
+func checkSuccessorsCorrect(nodes []string) (incorrectSuccessors int) {
+	incorrectSuccessors = 0
 	for i, node := range nodes {
-		conn := kvserver.GetGRPCConnection(node)
+		conn := getClientConn(node)
 		client := kvserver.NewChordRingClient(conn)
 
 		list, e := client.GetSuccessorList(context.Background(), new(empty.Empty))
@@ -79,19 +108,22 @@ func checkSuccessorsCorrect(nodes []string) bool {
 		for k, successor := range list.GetNodes() {
 			if successor.Address != correctSuccessorList[k] {
 				log.Printf("Node #%v addr %v has incorrect successor at index %v: %v instead of %v", i, node, k, successor.Address, correctSuccessorList[k])
-				return false
+				incorrectSuccessors++
 			}
 		}
 	}
-	return true
+	return
 }
 
 func main() {
+	clientCache = make(map[string](*grpc.ClientConn))
+	timeSet = false
+
 	log.SetPrefix("TRACE: ")
 	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
 	log.Println("log initialised")
 
-	nFlag := flag.Uint("N", 64, "Amount of nodes to check for")
+	nFlag := flag.Uint("N", 64, "Amount of nodes to check for. Use 0 for continous monitoring")
 	bootstrapAddrFlag := flag.String("addr", "127.0.0.1:21210", "the address of the node to bootrstrap from")
 	checkFingerTableFlag := flag.Bool("check_fingers", false, "also wait for fingertable to be correct")
 	checkSuccessorListFlag := flag.Bool("check_successors", false, "also wait for successor list to be correct")
@@ -103,33 +135,42 @@ func main() {
 	checkFingertable = *checkFingerTableFlag
 	checkSuccessors = *checkSuccessorListFlag
 
+	iterations := 0
 	for {
 		nodes := traverseSuccessors(bootstrapAddr)
 		log.Printf("Found %d nodes", len(nodes))
 
-		if len(nodes) != int(n) {
-			time.Sleep(500 * time.Millisecond)
-			continue
-		}
+		var incorrectSuccessors int
+		if checkSuccessors || n == 0 {
+			incorrectSuccessors = checkSuccessorsCorrect(nodes)
+			if incorrectSuccessors > 0 {
 
-		if checkSuccessors {
-			if !checkSuccessorsCorrect(nodes) {
-				time.Sleep(5000 * time.Millisecond)
-				continue
 			} else {
 				log.Print("All nodes have correct successors!")
 			}
 		}
 
-		if checkFingertable {
-			if !checkFingertables(nodes) {
-				time.Sleep(5000 * time.Millisecond)
-				continue
+		var incorrectFingerTableEntries int
+		if checkFingertable || n == 0 {
+			incorrectFingerTableEntries = checkFingertables(nodes)
+			if incorrectFingerTableEntries > 0 {
+				log.Printf("There are %v incorrect finger table entries", incorrectFingerTableEntries)
 			} else {
 				log.Print("All nodes have correct fingers!")
 			}
 		}
 
-		break
+		if n == 0 {
+			fmt.Printf("%v,%v,%v,%v\n", (time.Now().Sub(startTime)).Seconds(), len(nodes), incorrectSuccessors, incorrectFingerTableEntries)
+			if incorrectFingerTableEntries == 0 && incorrectSuccessors == 0 && iterations > 100 {
+				break
+			}
+		} else {
+			if len(nodes) == int(n) {
+				break
+			}
+		}
+		iterations++
+		time.Sleep(startTime.Add(time.Duration(100*iterations) * time.Millisecond).Sub(time.Now()))
 	}
 }

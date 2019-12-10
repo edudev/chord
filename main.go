@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	memcachedWrapper "github.com/edudev/chord/memcached"
 	kvserver "github.com/edudev/chord/server"
@@ -38,7 +37,7 @@ func isStable(reply chan bool) {
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	// TODO remove sleep
 	// this makes the logs a bit easier to follow for now
-	time.Sleep(10 * time.Second)
+	//time.Sleep(2 * time.Second)
 	reply <- true
 }
 
@@ -49,7 +48,6 @@ func waitForStability() {
 	go isStable(reply)
 	<-reply
 }
-
 
 func createNode(localAddr string, id uint) (server kvserver.ChordServer) {
 	addr := fmt.Sprintf("%v:%d", localAddr, chordPort+uint16(id))
@@ -133,7 +131,7 @@ func main() {
 	for id := uint(1); id < N; id++ {
 		newServer, servers = addNodeToRing(localAddr, nodeToJoinTo, servers, id)
 		listenAndServe(&wg, int(id), &newServer)
-		// waitForStability()
+		waitForStability()
 	}
 
 	fmt.Println(servers)

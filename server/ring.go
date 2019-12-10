@@ -22,7 +22,7 @@ var IntelligentFixFingers bool
 
 const (
 	TICK_STABILISE   = 1000 * time.Millisecond
-	TICK_FIX_FINGERS = 5000 * time.Millisecond
+	TICK_FIX_FINGERS = 1000 * time.Millisecond
 
 	// M as it is used in the paper. M specifies the size of the identifier ring,
 	// which is 2^M in size (M specifies the amount of bits in an identifier).
