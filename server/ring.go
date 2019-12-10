@@ -279,9 +279,11 @@ func (r *chordRing) initFingerTable(nodeToJoinAddress address) error {
 	}
 	r.fingerTableLock.Unlock()
 
-	r.learnNode(successor)
-	nodeToJoin := addr2node(nodeToJoinAddress)
-	r.learnNode(nodeToJoin)
+	if LearnNodes {
+		r.learnNode(successor)
+		nodeToJoin := addr2node(nodeToJoinAddress)
+		r.learnNode(nodeToJoin)
+	}
 
 	// TODO fill successors during join
 	return nil
