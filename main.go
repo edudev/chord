@@ -101,11 +101,13 @@ func main() {
 	localAddrFlag := flag.String("addr", "127.0.0.1", "local IP address to bind to")
 	learnNodesFlag := flag.Bool("learn_nodes", false, "whether to aggresively learn nodes for fingers")
 	intelligentFixFingersFlag := flag.Bool("fix_fingers", false, "whether to intelligently fix fingers")
+	logHopsFlag := flag.Bool("log_hops", false, "whether to log hop counts for predecessor search")
 
 	flag.Parse()
 
 	kvserver.LearnNodes = *learnNodesFlag
 	kvserver.IntelligentFixFingers = *intelligentFixFingersFlag
+	kvserver.LogHopCounts = *logHopsFlag
 
 	N := *nFlag
 	nodeToJoinTo := &*joinFlag

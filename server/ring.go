@@ -510,6 +510,9 @@ func isSuccessorResponsibleForPosition(p position, keyPos position, successor po
 	return cmpPosition(keyPos, p) > 0 || cmpPosition(keyPos, successor) <= 0
 }
 
+// LogHopCounts determines whether we should the amount of hops it takes to find a predecessor
+var LogHopCounts bool
+
 func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error) {
 	// iteratively ask nodes (rpc) until we get a node for which keyPos
 	// is between (node, nodeSuccessor]
@@ -518,8 +521,10 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 	successor := r.fingerTable[0]
 	r.fingerTableLock.RUnlock()
 
+	hops := 0
+
 	for !isSuccessorResponsibleForPosition(n.pos, keyPos, successor.pos) {
-		log.Printf("%v is not element of (%v, %v]", keyPos, n.pos, successor.pos)
+		hops++
 		n, e = r.rpcClosestPrecedingFinger(context.Background(), n, keyPos)
 		if e != nil {
 			r.nodeDied(n.addr)
@@ -530,6 +535,9 @@ func (r *chordRing) findPredecessor(keyPos position) (predecessor *node, e error
 			r.nodeDied(n.addr)
 			return nil, e
 		}
+	}
+	if LogHopCounts {
+		fmt.Printf("%v\t%v\n", time.Now().Format(time.RFC3339), hops)
 	}
 	return &n, nil
 }
