@@ -348,32 +348,6 @@ func (r *chordRing) stabilize() error {
 	return e
 }
 
-// makes sure the given node is in the successor list if there is space for it
-// may add more successors than necessary, should be removed after calling this function
-// CALLER MUST WRITE-LOCK r.successors and READ-LOCK on fingerTable!
-func (r *chordRing) ensureNodeInSuccessorList(n node) {
-	if n.addr == r.myNode.addr {
-		return
-	}
-	// check whether it fits inbetween our immediate succesor and first list entry
-	if len(r.successors) > 0 && isPosInRangExclusive(r.fingerTable[0].pos, n.pos, r.successors[0].pos) {
-		r.successors = append([]node{n}, r.successors...)
-		return
-	}
-	// check whether it fits inbetween existing nodes
-	for i := 0; i < len(r.successors)-1; i++ {
-		if isPosInRangExclusive(r.successors[i].pos, n.pos, r.successors[i+1].pos) {
-			// insert here
-			r.successors = append(r.successors[:i], append([]node{n}, r.successors[i:]...)...)
-			break
-		}
-	}
-	// it did not fit in front, it did not fit in between, so we will put it in back
-	if len(r.successors) < int(R-1) {
-		r.successors = append(r.successors, n)
-	}
-}
-
 // fixes the successor list if need be
 func (r *chordRing) fixSuccessors() error {
 	// very dumb version for now: will iteratively add new nodes to successor list
