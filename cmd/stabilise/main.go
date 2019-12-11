@@ -54,7 +54,8 @@ func traverseSuccessors(bootstrapAddr string) (nodesFound []string) {
 
 		nodeRPC, err := client.GetSuccessor(context.Background(), new(empty.Empty))
 		if err != nil {
-			log.Fatalf("Failed to execute RPC %v", err)
+			log.Printf("Failed to execute RPC %v", err)
+			return
 		}
 
 		nextNodeAddr = nodeRPC.GetAddress()
@@ -163,15 +164,11 @@ func main() {
 
 		if n == 0 {
 			fmt.Printf("%v,%v,%v,%v\n", (time.Now().Sub(startTime)).Seconds(), len(nodes), incorrectSuccessors, incorrectFingerTableEntries)
-			if incorrectFingerTableEntries == 0 && incorrectSuccessors == 0 && iterations > 100 {
-				break
-			}
-		} else {
-			if len(nodes) == int(n) {
-				break
-			}
+		}
+		if (n != 0 && int(n) == len(nodes)) && (!checkFingertable || incorrectFingerTableEntries == 0) && (!checkSuccessors || incorrectSuccessors == 0) && (n != 0 || iterations > 100) {
+			break
 		}
 		iterations++
-		time.Sleep(startTime.Add(time.Duration(100*iterations) * time.Millisecond).Sub(time.Now()))
+		time.Sleep(startTime.Add(time.Duration(1000*iterations) * time.Millisecond).Sub(time.Now()))
 	}
 }
