@@ -136,8 +136,6 @@ func main() {
 		waitForStability()
 	}
 
-	fmt.Println(servers)
-
 	wg.Wait()
 	shutdown(servers)
 }
