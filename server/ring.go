@@ -390,10 +390,11 @@ func (r *chordRing) fixSuccessors() error {
 
 	r.successorsLock.Lock()
 
-	r.fingerTableLock.RLock()
-	r.ensureNodeInSuccessorList(nextSuccessorToFix)
-	r.ensureNodeInSuccessorList(successorToAdd)
-	r.fingerTableLock.RUnlock()
+	if len(r.successors) > int(index) && r.successors[index].addr != successorToAdd.addr {
+		r.successors = append(r.successors[:index], append([]node{successorToAdd}, r.successors[index:]...)...)
+	} else {
+		r.successors = append(r.successors, successorToAdd)
+	}
 
 	r.rotateNextSuccessorFixIndex()
 	if len(r.successors) > int(R)-1 {
