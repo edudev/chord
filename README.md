@@ -121,6 +121,8 @@ $ nc -C localhost 11211
 
 ## Benchmarking on DAS-5
 
+This setup assumes that you have `chord` and `stabilise` executables in `${HOME}/opt/bin`.
+
 ```sh
 cd ${CHORDDIR}/test-scripts
 ./setup.sh # Only for first time
