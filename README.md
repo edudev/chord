@@ -1,4 +1,4 @@
-# A distributed key-value store using the CHORD protocol
+# A distributed key-value store using the Chord protocol
 This repository contains the implementation of a distributed key-value store based on the Chord protocol. The Chord paper followed for this project can be found [here](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf "Chord paper").
 
 # Getting started
@@ -52,8 +52,7 @@ For downloading this repository and building it, run the following commands in g
     go install github.com/edudev/chord
     ```
 
-**NOTE:** If you plan on runing chord with many nodes (40+) in a single process, add the following lines at the end of `/etc/security/limits.conf`
-
+**NOTE:** If you plan on runing chord with many nodes (40+) in a single process, add the following lines at the end of `/etc/security/limits.conf`. **Rebooting of computer is required to refresh the limits.**
 ```
 *         hard    nofile      500000
 *         soft    nofile      500000
