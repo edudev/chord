@@ -108,7 +108,12 @@ export PATH="${PATH}:${GOPATH}/bin"
 First virtual node's port is always `21210`. Second's is `21211` and it increases one by one for each node on the ring.
 
 ## Stabilisation
-For running the stabilisation part on the ring, change into `stabilise` directory:
+For running the stabilisation part on the ring, run following command at project directory:
+```sh
+go run main.go
+```
+
+Now change into `stabilise` directory and run:
 ```sh
 cd ${CHORDDIR}/cmd/stabilise
 ```
@@ -137,7 +142,7 @@ cd ${CHORDDIR}/cmd/stabilise
 
 # Testing
 ## Memcached text protocol
-For testing purposes, if you want to access a chord server, run a client instance with either `netcat` or `telnet`:
+For testing purposes, if you want to access a chord server, run a client instance with either `netcat` or `telnet` while running chord on another terminal:
 
 ```sh
 $ nc -C localhost 11211
