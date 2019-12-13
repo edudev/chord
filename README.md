@@ -60,6 +60,7 @@ For downloading this repository and building it, run the following commands in g
 root      hard    nofile      500000
 root      soft    nofile      500000
 ```
+**IMP:** Rebooting of computer is required to refresh the limits.
 
 # Usage
 Once the installation and building of the project is over, you are ready to go :) `[pun intended]`
