@@ -93,6 +93,7 @@ export PATH="${PATH}:${GOPATH}/bin"
     ```sh
     # Joining with 64 nodes (default) to node001
     chord -join <hostname:port|address:port>
+    chord -addr 127.0.0.2 -join 127.0.0.1:21210  
     chord -addr node002 -join node001:21210
     ```
 
@@ -108,7 +109,7 @@ export PATH="${PATH}:${GOPATH}/bin"
 First virtual node's port is always `21210`. Second's is `21211` and it increases one by one for each node on the ring.
 
 ## Stabilisation
-For running the stabilisation part on the ring, run following command at project directory:
+For running the stabilisation part on the ring, run following command at project directory `${CHORDDIR}`:
 ```sh
 go run main.go
 ```
@@ -142,7 +143,7 @@ cd ${CHORDDIR}/cmd/stabilise
 
 # Testing
 ## Memcached text protocol
-For testing purposes, if you want to access a chord server, run a client instance with either `netcat` or `telnet` while running chord on another terminal:
+For testing purposes, if you want to access a chord server, run a client instance with either `netcat` or `telnet` while running chord instance on another terminal:
 
 ```sh
 $ nc -C localhost 11211
