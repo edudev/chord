@@ -16,16 +16,6 @@ For other distributions, please refer to golang installation page [here](https:/
 
 The `GOPATH` environment variable specifies the location of your workspace. If you want to use a custom location as your workspace, you can set the `GOPATH environment variable` by exporting in `.bashrc`, `.zshrc` etc. This [page](https://github.com/golang/go/wiki/SettingGOPATH "Setting GOPATH") explains how to set this variable on various platforms.
 
-For example, for bash, edit your `~/.bash_profile` to add the following line:
-
-```sh
-export GOPATH=$HOME/go
-```
-Save and exit your editor. Then, source your `~/.bash_profile`.
-```sh
-source ~/.bash_profile
-```
-
 ### gRPC and Protocol Buffers
 
 If you are on `Debian` or `Ubuntu`, run the following command:
