@@ -16,39 +16,6 @@ const (
 	chordPort uint16 = 21210
 )
 
-func isStable(reply chan bool) {
-	// Make RPC calls to each node to fetch
-	// their last finger table update
-
-	// Basic example of time difference
-	// given below
-
-	// NOTE: Either fix time everywhere as UTC
-	// or Unix(). Keep it one
-
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	// lastFingerTableUpdateTime := time.Date(2019, 11, 29, 20, 19, 48, 324359102, time.UTC)
-	// currentTime := time.Now().UTC()
-
-	// if diff := currentTime.Sub(lastFingerTableUpdateTime).Seconds(); diff > 10 {
-	// 	return true
-	// }
-	// return false
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	// TODO remove sleep
-	// this makes the logs a bit easier to follow for now
-	//time.Sleep(2 * time.Second)
-	reply <- true
-}
-
-func waitForStability() {
-	// Using blocking channel to wait until
-	// isStable function reply with true
-	reply := make(chan bool)
-	go isStable(reply)
-	<-reply
-}
-
 func createNode(localAddr string, id uint) (server kvserver.ChordServer) {
 	addr := fmt.Sprintf("%v:%d", localAddr, chordPort+uint16(id))
 	server = kvserver.New(addr)
@@ -133,7 +100,6 @@ func main() {
 	for id := uint(1); id < N; id++ {
 		newServer, servers = addNodeToRing(localAddr, nodeToJoinTo, servers, id)
 		listenAndServe(&wg, int(id), &newServer)
-		waitForStability()
 	}
 
 	wg.Wait()
