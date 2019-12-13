@@ -5,7 +5,7 @@ This repository contains the implementation of a distributed key-value store bas
 ## Prerequisites
 Golang, gRPC and Protocol buffers are needed to run this project. The following instructions will get you a copy of the project up and running on your local machine for development and testing purposes. 
 
-#### Go
+### Go
 For running this project smoothly, you need `golang version >= 1.10`. If you are on `Debian buster` or `Ubuntu bionic`, run the following commands:
 
 ```sh
@@ -26,7 +26,7 @@ Save and exit your editor. Then, source your `~/.bash_profile`.
 source ~/.bash_profile
 ```
 
-#### gRPC and Protocol Buffers
+### gRPC and Protocol Buffers
 
 If you are on `Debian` or `Ubuntu`, run the following command:
 
