@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	memcachedWrapper "github.com/edudev/chord/memcached"
 	kvserver "github.com/edudev/chord/server"
@@ -38,7 +37,7 @@ func isStable(reply chan bool) {
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	// TODO remove sleep
 	// this makes the logs a bit easier to follow for now
-	time.Sleep(10 * time.Second)
+	//time.Sleep(2 * time.Second)
 	reply <- true
 }
 
@@ -49,7 +48,6 @@ func waitForStability() {
 	go isStable(reply)
 	<-reply
 }
-
 
 func createNode(localAddr string, id uint) (server kvserver.ChordServer) {
 	addr := fmt.Sprintf("%v:%d", localAddr, chordPort+uint16(id))
@@ -101,8 +99,15 @@ func main() {
 	nFlag := flag.Uint("N", 64, "number of nodes to run in this process")
 	joinFlag := flag.String("join", "", "an existing node to join to")
 	localAddrFlag := flag.String("addr", "127.0.0.1", "local IP address to bind to")
+	learnNodesFlag := flag.Bool("learn_nodes", false, "whether to aggresively learn nodes for fingers")
+	intelligentFixFingersFlag := flag.Bool("fix_fingers", false, "whether to intelligently fix fingers")
+	logHopsFlag := flag.Bool("log_hops", false, "whether to log hop counts for predecessor search")
 
 	flag.Parse()
+
+	kvserver.LearnNodes = *learnNodesFlag
+	kvserver.IntelligentFixFingers = *intelligentFixFingersFlag
+	kvserver.LogHopCounts = *logHopsFlag
 
 	N := *nFlag
 	nodeToJoinTo := &*joinFlag
@@ -128,10 +133,8 @@ func main() {
 	for id := uint(1); id < N; id++ {
 		newServer, servers = addNodeToRing(localAddr, nodeToJoinTo, servers, id)
 		listenAndServe(&wg, int(id), &newServer)
-		// waitForStability()
+		waitForStability()
 	}
-
-	fmt.Println(servers)
 
 	wg.Wait()
 	shutdown(servers)

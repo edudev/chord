@@ -11,6 +11,8 @@ service ChordRing {
   rpc FindSuccessor (LookupRequest) returns (RPCNode) {}
   rpc GetPredecessor (google.protobuf.Empty) returns (PredecessorReply) {}
   rpc Notify(RPCNode) returns (google.protobuf.Empty) {}
+  rpc GetFingerTable(google.protobuf.Empty) returns (ListOfNodes) {}
+  rpc GetSuccessorList(google.protobuf.Empty) returns (ListOfNodes) {}
 }
 
 message LookupRequest {
@@ -25,4 +27,8 @@ message RPCNode {
 message PredecessorReply {
   bool valid = 1;
   RPCNode node = 2;
+}
+
+message ListOfNodes {
+  repeated RPCNode nodes = 1;
 }
