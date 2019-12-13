@@ -110,7 +110,14 @@ export PATH="${PATH}:${GOPATH}/bin"
 First virtual node's port is always `21210`. Second's is `21211` and it increases one by one for each node on the ring.
 
 ## Stabilisation
-For running the stabilisation part on the ring, run following command at project directory `${CHORDDIR}`:
+For running the stabilisation part on the ring, chord instance should be already running.
+
+If it is not running, either run:
+```sh
+chord
+```
+
+or run following command at project directory `${CHORDDIR}`:
 ```sh
 go run main.go
 ```
