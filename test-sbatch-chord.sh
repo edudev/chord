@@ -32,7 +32,7 @@ rm -rf "${HOME}/chord/collectd/var/lib/collectd/"*".cm.cluster"
 
 CHORD_EXEC="${HOME}/opt/bin/chord"
 echo $'\n'"Starting Chord..."
-CHORD_ARGS=( -N 2 -addr "${A[0]}.ib.cluster" )
+CHORD_ARGS=( -N 32 -addr "${A[0]}.ib.cluster" )
 cat >"chord_0.sh" <<EOT
 #!/usr/bin/env bash
 "${collectd_dir}/sbin/collectd" -f -C "${collectd_dir}/etc/collectd.conf" &
@@ -45,7 +45,7 @@ echo "Chord started on: ${A[0]}"$'\n'"Output of Chord: ${WORKDIR}/chord_out0"
 
 (n=1
 while [ $n -lt $IC ]; do
-CHORD_ARGS=( -N 2 -addr "${A[${n}]}.ib.cluster" -join "${A[0]}.ib.cluster:21210" )
+CHORD_ARGS=( -N 32 -addr "${A[${n}]}.ib.cluster" -join "${A[0]}.ib.cluster:21210" )
 cat >"chord_${n}.sh" <<EOT
 #!/usr/bin/env bash
 "${collectd_dir}/sbin/collectd" -f -C "${collectd_dir}/etc/collectd.conf" &
@@ -60,7 +60,7 @@ done)
 
 STABILISE_EXEC="${HOME}/opt/bin/stabilise"
 echo $'\n'"Starting Stabilise..."
-STABILISE_ARGS=( "${A[0]}.ib.cluster:21210" "$(( IC * 2 ))" )
+STABILISE_ARGS=( -addr "${A[0]}.ib.cluster:21210" -N "$(( IC * 32 ))" )
 srun "-N1" -w "${B[0]}" "$STABILISE_EXEC" "${STABILISE_ARGS[@]}" >"${WORKDIR}/stabilise_out" 2>&1
 echo "Stabilise done on: ${B[0]}."
 
