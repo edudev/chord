@@ -5,7 +5,6 @@ import (
 	hash "crypto/sha1"
 	fmt "fmt"
 	"log"
-	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -67,7 +66,7 @@ type chordRing struct {
 	fingerTable          [M]node
 	fingerTablePositions [M]position
 	fingerTableLock      sync.RWMutex
-	nextFingerFixIndex   uint
+	nextFingerFixIndex   int
 
 	// `predecessor` should really be an optional instead of a pointer
 	predecessor     *node
@@ -79,7 +78,7 @@ type chordRing struct {
 
 	stopped         chan bool
 	stabiliseQueue  chan bool
-	fixFingersQueue chan uint
+	fixFingersQueue chan int
 
 	UnimplementedChordRingServer
 }
@@ -123,14 +122,14 @@ func newChordRing(server *ChordServer, myAddress address, grpcServer *grpc.Serve
 	ring := &chordRing{
 		server:                server,
 		myNode:                addr2node(myAddress),
-		nextFingerFixIndex:    M - 1,
+		nextFingerFixIndex:    int(M - 1),
 		nextSuccessorFixIndex: 0,
 		successors:            make([]node, 0, R-1),
 		predecessor:           nil,
 
 		stopped:         make(chan bool, 2),
 		stabiliseQueue:  make(chan bool, 2),
-		fixFingersQueue: make(chan uint, 200),
+		fixFingersQueue: make(chan int, 200),
 	}
 
 	for i := range ring.fingerTablePositions {
@@ -200,10 +199,10 @@ func (r *chordRing) nodeDied(addr address) {
 
 	// fix fingerTable, excluding successor
 	notifiedFixFingerRoutine := false
-	for i := M - 1; i > 0; i-- {
+	for i := int(M - 1); i > 0; i-- {
 		if r.fingerTable[i].addr == addr {
 			var s node
-			if i == M-1 {
+			if i == int(M-1) {
 				s = r.myNode
 			} else {
 				s = r.fingerTable[i+1]
@@ -243,7 +242,7 @@ func (r *chordRing) learnNode(n node) {
 		if k == 0 {
 			continue
 		}
-		p := r.calculateFingerTablePosition(uint(k))
+		p := r.calculateFingerTablePosition(k)
 		if isPosInRangExclusive(p, n.pos, finger.pos) {
 			replacementIndices = append(replacementIndices, k)
 		}
@@ -254,7 +253,7 @@ func (r *chordRing) learnNode(n node) {
 		// 2. replace indices if still correct
 		r.fingerTableLock.Lock()
 		for _, k := range replacementIndices {
-			p := r.calculateFingerTablePosition(uint(k))
+			p := r.calculateFingerTablePosition(k)
 			if isPosInRangExclusive(p, n.pos, r.fingerTable[k].pos) {
 				r.fingerTable[k] = n
 			}
@@ -372,6 +371,10 @@ func (r *chordRing) fixSuccessors() error {
 		r.nodeDied(nextSuccessorToFix.addr)
 		// a new stabilise run will be scheduled by nodeDied
 		return e
+	} else {
+		if LearnNodes {
+			r.learnNode(nextSuccessorToFix)
+		}
 	}
 
 	r.successorsLock.Lock()
@@ -403,21 +406,21 @@ func (r *chordRing) getClient(addr address) (client ChordRingClient) {
 }
 
 // sets the nextFingerFixIndex to the next value and returns the old one
-func (r *chordRing) rotateNextFingerFixIndex() (k uint) {
+func (r *chordRing) rotateNextFingerFixIndex() (k int) {
 	k = r.nextFingerFixIndex
-	if r.nextFingerFixIndex == 0 {
-		r.nextFingerFixIndex = M - 1
+	if r.nextFingerFixIndex <= 0 {
+		r.nextFingerFixIndex = int(M - 1)
 	} else {
 		r.nextFingerFixIndex--
 	}
 	return
 }
 
-func wrapNextFingerFixIndex(k uint) uint {
-	if k == math.MaxUint64 {
-		return M - 1
+func wrapNextFingerFixIndex(k int) int {
+	if k < 0 {
+		return int(M - 1)
 	}
-	if k == M {
+	if k >= int(M) {
 		return 0
 	}
 
@@ -432,7 +435,7 @@ func (r *chordRing) rotateNextSuccessorFixIndex() (k uint) {
 }
 
 // the fix finger function according to the paper
-func (r *chordRing) fixFingers(k uint) error {
+func (r *chordRing) fixFingers(k int) error {
 	log.Printf("[%v] fixing fingers... %5v", r.myNode, k)
 	n := r.calculateFingerTablePosition(k)
 	finger, e := r.findSuccessor(n)
@@ -452,24 +455,46 @@ func (r *chordRing) fixFingers(k uint) error {
 		// joined node, and the case where the old finger has died
 
 		log.Printf("[%v] fixing finger %5v: %v", r.myNode, k, finger)
-		r.fingerTable[k] = finger
 		shouldRepeatFixFingers = true
-	}
-	r.fingerTableLock.Unlock()
-
-	if shouldRepeatFixFingers {
-		r.askToFixFingers(wrapNextFingerFixIndex(k - 1))
+		r.fingerTable[k] = finger
 		if LearnNodes {
-			r.learnNode(finger)
+			k--
+			for ; k >= 0; k-- {
+				p := r.calculateFingerTablePosition(k)
+				if isPosInRangExclusive(p, finger.pos, r.fingerTable[k].pos) {
+					log.Printf("[%v] also fixing finger %5v: %v", r.myNode, k, finger)
+					r.fingerTable[k] = finger
+				} else {
+					break
+				}
+			}
+		}
+
+	} else {
+	}
+	if IntelligentFixFingers {
+		for i, f := range r.fingerTable {
+			if f.addr != r.fingerTable[0].addr {
+				if k < i {
+					k = int(M)
+				}
+				break
+			}
 		}
 	}
 
-	log.Printf("[%v] fixing fingers... %5v done", r.myNode, k)
+	if shouldRepeatFixFingers && IntelligentFixFingers {
+		r.askToFixFingers(wrapNextFingerFixIndex(k - 1))
+	} else {
+		r.nextFingerFixIndex = wrapNextFingerFixIndex(k - 1)
+	}
+	r.fingerTableLock.Unlock()
+
 	return nil
 }
 
 // calculates n + 2^k mod 2^M
-func (r *chordRing) calculateFingerTablePosition(k uint) position {
+func (r *chordRing) calculateFingerTablePosition(k int) position {
 	return r.fingerTablePositions[k]
 }
 
@@ -725,7 +750,7 @@ func (r *chordRing) askToStabilise() {
 	}
 }
 
-func (r *chordRing) askToFixFingers(index uint) {
+func (r *chordRing) askToFixFingers(index int) {
 	if !IntelligentFixFingers {
 		return
 	}
