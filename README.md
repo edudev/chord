@@ -1,6 +1,8 @@
 # A distributed key-value store using the Chord protocol
 This repository contains the implementation of a distributed key-value store based on the Chord protocol. The Chord paper followed for this project can be found [here](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf "Chord paper").
 
+A detailed report with our findings can be found [here](report.pdf).
+
 # Getting started
 ## Prerequisites
 Golang, gRPC and Protocol buffers are needed to run this project. The following instructions will get you a copy of the project up and running on your local machine for development and testing purposes. 
